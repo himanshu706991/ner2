@@ -1,0 +1,682 @@
+sentence_grouped = merged_df.groupby("Sentence_ID")
+data = []
+for _, group in sentence_grouped:
+    tokens = group["Token"].tolist()
+    labels = group["Tag"].fillna("O").tolist()  # Handle missing labels
+    data.append((tokens, labels))
+
+#####
+Convert Labels to Numeric IDs
+We need to map text labels (B-ORG, I-LOC, O, etc.) to numerical IDs because our model works with numbers.
+
+python
+Copy
+Edit
+# Get all unique labels
+unique_labels = list(set(merged_df["Tag"].dropna().unique()))
+
+# Create mappings
+label2id = {label: i for i, label in enumerate(["O"] + unique_labels)}  # Ensure "O" (outside entity) is first
+id2label = {i: label for label, i in label2id.items()}
+###
+ Full NER Model Training Pipeline
+📌 Steps:
+Load Data from CSV Files (sentences & token-level annotations)
+Merge Sentences with Tokens
+Prepare Tokenized Data (Handles subwords & padding)
+Convert Labels to Numerical Format (O, B-, I- tagging)
+Create PyTorch Dataset & DataLoader
+Train BERT for Token Classification
+Save Trained Model Locally
+✅ Complete Code
+python
+Copy
+Edit
+import pandas as pd
+import torch
+from torch.utils.data import Dataset, DataLoader
+from transformers import BertTokenizerFast, BertForTokenClassification, Trainer, TrainingArguments
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+# 🔹 Load Data
+sentences_df = pd.read_csv("C:/data/sentences.csv")  # Sentence descriptions
+tokens_df = pd.read_csv("C:/data/tokens.csv")  # Token-level annotations
+
+# 🔹 Merge sentences with tokens using sentence_id
+merged_df = tokens_df.merge(sentences_df, on="sentence_id", how="left")
+
+# 🔹 Load Tokenizer
+model_name = "bert-base-uncased"  # Change if using a different model
+tokenizer = BertTokenizerFast.from_pretrained(model_name)
+
+# 🔹 Prepare Data
+sentence_grouped = merged_df.groupby("sentence_id")
+data = []
+for _, group in sentence_grouped:
+    tokens = group["token"].tolist()
+    labels = group["tag"].fillna("O").tolist()  # Fill missing labels as 'O' (no entity)
+    data.append((tokens, labels))
+
+# 🔹 Convert Labels to Numerical Format
+unique_labels = list(set(merged_df["tag"].dropna().unique()))
+label2id = {label: i for i, label in enumerate(["O"] + unique_labels)}  # 'O' for non-entities
+id2label = {i: label for label, i in label2id.items()}
+
+class NERDataset(Dataset):
+    def __init__(self, data, tokenizer, label2id, max_len=128):
+        self.data = data
+        self.tokenizer = tokenizer
+        self.label2id = label2id
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        tokens, labels = self.data[idx]
+        encoding = self.tokenizer(tokens, is_split_into_words=True, truncation=True, padding="max_length", max_length=self.max_len, return_tensors="pt")
+        
+        word_ids = encoding.word_ids()
+        label_ids = []
+        previous_word_idx = None
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore padding tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(self.label2id.get(labels[word_idx], 0))  # Assign label or 'O'
+            else:
+                label_ids.append(-100)  # Ignore subwords
+            previous_word_idx = word_idx
+
+        encoding["labels"] = torch.tensor(label_ids)
+        return {key: val.squeeze(0) for key, val in encoding.items()}
+
+# 🔹 Split Data
+data_train, data_test = train_test_split(data, test_size=0.2, random_state=42)
+
+train_dataset = NERDataset(data_train, tokenizer, label2id)
+test_dataset = NERDataset(data_test, tokenizer, label2id)
+
+# 🔹 Load Model for Token Classification
+model = BertForTokenClassification.from_pretrained(model_name, num_labels=len(label2id))
+
+# 🔹 Training Arguments
+training_args = TrainingArguments(
+    output_dir="./ner_model",
+    evaluation_strategy="epoch",
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    logging_dir="./logs",
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=test_dataset,
+)
+
+# 🔹 Train Model
+trainer.train()
+
+# 🔹 Save Trained Model
+model.save_pretrained("C:/data/ner_model")
+tokenizer.save_pretrained("C:/data/ner_model")
+
+print("✅ NER Model Training Completed!")
+🔹 Expected Output (Final Step)
+Copy
+Edit
+✅ NER Model Training Completed!
+The trained model will be saved in C:/data/ner_model/ and can be loaded for inference.
+
+✅ Key Features
+✔ Handles Missing Labels (O for non-entities)
+✔ Supports Subword Tokenization
+✔ Uses Trainer for Efficient Training
+✔ Splits Data for Training & Evaluation
+✔ Saves Model Locally for Offline Use
+
+Let me know if you need any modifications! 🚀
+
+
+
+
+
+
+You said:
+i don t have api key
+ChatGPT said:
+You don’t need an API key to use a local BERT model. Since you're working offline on Windows, you just need to download the model manually and place it in a folder.
+
+🔹 Steps to Download BERT Model Locally
+1️⃣ Download the Model Manually
+Open your browser and go to:
+🔗 https://huggingface.co/bert-base-uncased
+Click "Download model" (Download all files inside pytorch_model.bin, config.json, tokenizer.json, etc.)
+Extract the files into a local directory, e.g., C:/models/bert-base-uncased/
+2️⃣ Load the Model from Local Folder
+Now, modify your script to load BERT from the local path instead of downloading it:
+
+python
+Copy
+Edit
+# Set your local model path
+model_path = "C:/models/bert-base-uncased/"
+
+# Load Tokenizer and Model from local path
+tokenizer = BertTokenizerFast.from_pretrained(model_path)
+model = BertForTokenClassification.from_pretrained(model_path, num_labels=len(label2id))
+3️⃣ Train & Save Model Locally
+After training, save the model so it can be reused later:
+
+python
+Copy
+Edit
+# Save the trained model locally
+model.save_pretrained("C:/models/ner_model/")
+tokenizer.save_pretrained("C:/models/ner_model/")
+✅ Summary
+No API key needed 🚀
+Download BERT manually & store it locally
+Use local path in your script instead of from_pretrained("bert-base-uncased")
+Now your NER model training will work completely offline! Let me know if you need further help. 🔥
+
+
+
+
+
+
+You said:
+i am using colab
+ChatGPT said:
+Since you are using Google Colab, you don't need an API key. You can download the BERT model locally in Colab and use it without requiring internet access every time.
+
+🔹 Steps to Use BERT Offline in Colab
+1️⃣ Download BERT and Save Locally
+First, download and save the model inside Colab’s storage (/content/bert-base-uncased).
+
+python
+Copy
+Edit
+from transformers import BertTokenizerFast, BertForTokenClassification
+
+# Download and save the model locally
+model_name = "bert-base-uncased"
+save_path = "/content/bert-base-uncased"
+
+# Download and save tokenizer & model
+tokenizer = BertTokenizerFast.from_pretrained(model_name)
+model = BertForTokenClassification.from_pretrained(model_name)
+
+# Save model and tokenizer for offline use
+tokenizer.save_pretrained(save_path)
+model.save_pretrained(save_path)
+
+print("Model and tokenizer downloaded and saved locally!")
+2️⃣ Load the Model from Local Storage
+Once saved, you can load it offline in Colab.
+
+python
+Copy
+Edit
+# Load the model and tokenizer from local storage
+local_model_path = "/content/bert-base-uncased"
+
+tokenizer = BertTokenizerFast.from_pretrained(local_model_path)
+model = BertForTokenClassification.from_pretrained(local_model_path, num_labels=len(label2id))
+
+print("Model loaded successfully from local storage!")
+3️⃣ Train & Save Your NER Model
+After training, save the fine-tuned model inside Colab.
+
+python
+Copy
+Edit
+model.save_pretrained("/content/ner_model")
+tokenizer.save_pretrained("/content/ner_model")
+print("NER Model Training Completed and Saved Locally!")
+4️⃣ Download Model to Your PC (Optional)
+If you want to download the trained model to your PC, run:
+
+python
+Copy
+Edit
+from google.colab import files
+import shutil
+
+shutil.make_archive("/content/ner_model", 'zip', "/content/ner_model")
+files.download("/content/ner_model.zip")
+✅ Summary
+Download BERT & save locally in Colab ✅
+Load from /content/bert-base-uncased/ instead of the internet ✅
+Train, fine-tune, and save your NER model offline ✅
+Optionally, download the model to your PC ✅
+This will ensure your NER pipeline works without internet access in Colab! 🚀
+
+
+
+
+
+
+You said:
+i am getting dimen ion error 
+ChatGPT said:
+You're likely encountering a dimension mismatch error in the labels when passing them to the model. This usually happens due to incorrect alignment between tokenized inputs and their respective labels. Let's fix this step by step.
+
+🔍 Why Does This Happen?
+Tokenizer creates subwords:
+
+Example: "Washington" → [ "wash", "##ington" ]
+The label should align with this tokenized output.
+Padding & truncation:
+
+Tokens are padded ([PAD]) to max length, but labels must align.
+Mismatch between token IDs and labels:
+
+The model expects labels of shape (batch_size, sequence_length), matching the input shape.
+🔧 Fix: Ensure Proper Label Alignment
+Modify your dataset class (NERDataset) to correctly handle subwords, padding, and truncation.
+
+🔹 Corrected NERDataset Class
+python
+Copy
+Edit
+import torch
+from torch.utils.data import Dataset
+
+class NERDataset(Dataset):
+    def __init__(self, data, tokenizer, label2id, max_len=128):
+        self.data = data
+        self.tokenizer = tokenizer
+        self.label2id = label2id
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        tokens, labels = self.data[idx]
+
+        # Tokenize and align labels
+        encoding = self.tokenizer(tokens, is_split_into_words=True, 
+                                  truncation=True, padding="max_length", 
+                                  max_length=self.max_len, return_tensors="pt")
+
+        word_ids = encoding.word_ids()  # Map subwords to original word indices
+        label_ids = []
+        previous_word_idx = None
+
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore padding tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(self.label2id.get(labels[word_idx], 0))  # Assign correct label
+            else:
+                label_ids.append(-100)  # Ignore subwords (only assign label to first subword)
+            previous_word_idx = word_idx
+
+        encoding["labels"] = torch.tensor(label_ids, dtype=torch.long)  # Ensure correct dtype
+        return {key: val.squeeze(0) for key, val in encoding.items()}  # Remove extra batch dimension
+📌 Key Fixes
+✅ Properly maps labels to first subword of a token.
+✅ Uses -100 for padding & ignored tokens (prevents dimension mismatch).
+✅ Ensures labels and tokens have the same shape (max_length=128).
+
+Try using this updated NERDataset class and rerun your training. 🚀 Let me know if you still face issues!
+
+
+
+
+
+
+You said:
+after this step i am not under stanging  #Merge sentences with tokens using sentence_id
+merged_df = df_tokens.merge(df_sentences, on="Sentence_ID", how="left")
+merged_df
+ChatGPT said:
+Let me clarify the sentence-token merging step for you.
+
+🔍 Understanding merge() for Sentence-Token Alignment
+Your dataset consists of two files:
+
+Sentences file (df_sentences) – Contains sentence-level data
+nginx
+Copy
+Edit
+Sentence_ID  Sentence
+1           "Apple is a company."
+2           "John lives in New York."
+Tokens file (df_tokens) – Contains token-level data (words and labels)
+mathematica
+Copy
+Edit
+Sentence_ID  Token    Tag
+1           Apple    B-ORG
+1           is       O
+1           a        O
+1           company  O
+2           John     B-PER
+2           lives    O
+2           in       O
+2           New      B-LOC
+2           York     I-LOC
+🔹 What Does merge() Do?
+We use merge() to combine sentence-level and token-level data by matching the Sentence_ID.
+
+python
+Copy
+Edit
+merged_df = df_tokens.merge(df_sentences, on="Sentence_ID", how="left")
+This results in:
+
+mathematica
+Copy
+Edit
+Sentence_ID  Token    Tag     Sentence
+1           Apple    B-ORG   "Apple is a company."
+1           is       O       "Apple is a company."
+1           a        O       "Apple is a company."
+1           company  O       "Apple is a company."
+2           John     B-PER   "John lives in New York."
+2           lives    O       "John lives in New York."
+2           in       O       "John lives in New York."
+2           New      B-LOC   "John lives in New York."
+2           York     I-LOC   "John lives in New York."
+Each token is now linked to its full sentence.
+This helps in reconstructing sentence-token pairs for training.
+🔧 If You Get an Error (KeyError: 'Sentence_ID')
+Ensure both df_sentences and df_tokens have the same column name for sentence IDs.
+If Sentence_ID has different capitalization, convert it to lowercase:
+python
+Copy
+Edit
+df_sentences.columns = df_sentences.columns.str.lower()
+df_tokens.columns = df_tokens.columns.str.lower()
+Then, merge using:
+python
+Copy
+Edit
+merged_df = df_tokens.merge(df_sentences, on="sentence_id", how="left")
+✅ Next Steps
+After merging, you can proceed with grouping tokens by sentence ID:
+
+python
+Copy
+Edit
+sentence_grouped = merged_df.groupby("Sentence_ID")
+data = []
+for _, group in sentence_grouped:
+    tokens = group["Token"].tolist()
+    labels = group["Tag"].fillna("O").tolist()  # Handle missing labels
+    data.append((tokens, labels))
+This prepares sentence-token pairs for training.
+
+Let me know if you still have doubts! 🚀
+
+
+
+
+
+
+You said:
+after this
+ChatGPT said:
+Once you've successfully merged df_tokens and df_sentences, the next steps involve preparing the dataset for the NER model.
+
+🚀 Next Steps After Merging Data
+1️⃣ Group Tokens by Sentence
+Now that each token has its corresponding sentence, group them by Sentence_ID so we can convert them into a structured format for training.
+
+python
+Copy
+Edit
+sentence_grouped = merged_df.groupby("Sentence_ID")
+data = []
+
+for _, group in sentence_grouped:
+    tokens = group["Token"].tolist()
+    labels = group["Tag"].fillna("O").tolist()  # Fill missing labels with "O" (non-entity)
+    data.append((tokens, labels))
+✅ Now, data is a list of tuples:
+
+python
+Copy
+Edit
+[
+    (["Apple", "is", "a", "company"], ["B-ORG", "O", "O", "O"]),
+    (["John", "lives", "in", "New", "York"], ["B-PER", "O", "O", "B-LOC", "I-LOC"])
+]
+2️⃣ Convert Labels to Numeric IDs
+We need to map text labels (B-ORG, I-LOC, O, etc.) to numerical IDs because our model works with numbers.
+
+python
+Copy
+Edit
+# Get all unique labels
+unique_labels = list(set(merged_df["Tag"].dropna().unique()))
+
+# Create mappings
+label2id = {label: i for i, label in enumerate(["O"] + unique_labels)}  # Ensure "O" (outside entity) is first
+id2label = {i: label for label, i in label2id.items()}
+Example output:
+
+python
+Copy
+Edit
+{
+    "O": 0,
+    "B-ORG": 1,
+    "B-PER": 2,
+    "B-LOC": 3,
+    "I-LOC": 4
+}
+3️⃣ Tokenization & Dataset Preparation
+Now, we tokenize sentences and align labels to match tokenized words.
+
+🔹 Load Tokenizer
+python
+Copy
+Edit
+from transformers import BertTokenizerFast
+
+model_name = "bert-base-uncased"
+tokenizer = BertTokenizerFast.from_pretrained(model_name)
+🔹 Custom Dataset Class for PyTorch
+python
+Copy
+Edit
+import torch
+from torch.utils.data import Dataset
+
+class NERDataset(Dataset):
+    def __init__(self, data, tokenizer, label2id, max_len=128):
+        self.data = data
+        self.tokenizer = tokenizer
+        self.label2id = label2id
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        tokens, labels = self.data[idx]
+
+        # Tokenize sentence
+        encoding = self.tokenizer(tokens, is_split_into_words=True, 
+                                  truncation=True, padding="max_length", 
+                                  max_length=self.max_len, return_tensors="pt")
+
+        word_ids = encoding.word_ids()  # Align tokens with original words
+        label_ids = []
+        previous_word_idx = None
+
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore padding tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(self.label2id.get(labels[word_idx], 0))  # Assign label or 'O'
+            else:
+                label_ids.append(-100)  # Ignore subwords
+            previous_word_idx = word_idx
+
+        encoding["labels"] = torch.tensor(label_ids)
+        return {key: val.squeeze(0) for key, val in encoding.items()}
+4️⃣ Train-Test Split
+We split the dataset 80% for training, 20% for testing.
+
+python
+Copy
+Edit
+from sklearn.model_selection import train_test_split
+
+data_train, data_test = train_test_split(data, test_size=0.2, random_state=42)
+
+train_dataset = NERDataset(data_train, tokenizer, label2id)
+test_dataset = NERDataset(data_test, tokenizer, label2id)
+5️⃣ Load BERT for Token Classification
+We now load bert-base-uncased with a classification head for NER:
+
+python
+Copy
+Edit
+from transformers import BertForTokenClassification
+
+model = BertForTokenClassification.from_pretrained(model_name, num_labels=len(label2id))
+6️⃣ Define Training Arguments & Trainer
+Now, we define training configurations and use the Trainer API for training.
+
+python
+Copy
+Edit
+from transformers import Trainer, TrainingArguments
+
+training_args = TrainingArguments(
+    output_dir="./ner_model",
+    evaluation_strategy="epoch",
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    logging_dir="./logs",
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=test_dataset,
+)
+7️⃣ Start Training
+Now, we train the model:
+
+python
+Copy
+Edit
+trainer.train()
+8️⃣ Save the Model
+After training, save the model and tokenizer:
+
+python
+Copy
+Edit
+model.save_pretrained("/mnt/data/ner_model")
+tokenizer.save_pretrained("/mnt/data/ner_model")
+
+print("NER Model Training Completed!")
+🎯 Final Flow Summary
+Merge sentence and token data (merge())
+Group tokens by Sentence_ID
+Convert labels to numerical IDs (label2id)
+Tokenize text and prepare dataset (NERDataset)
+Train-test split (train_test_split)
+Load bert-base-uncased for NER classification
+Define training arguments and train with Trainer
+Save model & tokenizer for inference
+💡 Next Steps
+If you get shape mismatch errors, check that label alignment is correct (word_ids() handling).
+If loss doesn't decrease, try learning rate tuning or adding more epochs.
+Run inference on test sentences after training.
+Let me know if you need debugging help! 🚀
+
+
+
+
+
+
+You said:
+check test data performance
+ChatGPT said:
+To evaluate the test data performance after training, follow these steps:
+
+1️⃣ Define Evaluation Function
+Hugging Face's Trainer has an evaluate() method to compute loss, but we need to manually compute precision, recall, and F1-score for NER.
+
+First, install seqeval (for entity-based evaluation):
+
+python
+Copy
+Edit
+!pip install seqeval
+Now, import the required modules:
+
+python
+Copy
+Edit
+from seqeval.metrics import classification_report
+import numpy as np
+import torch
+2️⃣ Generate Predictions on Test Set
+We use Trainer.predict() to get model outputs:
+
+python
+Copy
+Edit
+predictions, labels, _ = trainer.predict(test_dataset)
+
+# Convert logits to predicted label indices
+predictions = np.argmax(predictions, axis=2)
+3️⃣ Convert Predictions & Labels to Original Format
+Since the dataset uses -100 to ignore padding tokens, we need to remove them and convert indices back to labels.
+
+python
+Copy
+Edit
+# Convert IDs to labels
+true_labels = [[id2label[label] for label in label_row if label != -100] for label_row in labels]
+pred_labels = [[id2label[pred] for pred, label in zip(pred_row, label_row) if label != -100] 
+               for pred_row, label_row in zip(predictions, labels)]
+4️⃣ Compute Precision, Recall, and F1-score
+Now, generate a classification report:
+
+python
+Copy
+Edit
+print(classification_report(true_labels, pred_labels))
+This will output metrics like:
+
+css
+Copy
+Edit
+              precision    recall  f1-score   support
+    B-ORG       0.91      0.89      0.90       250
+    I-ORG       0.87      0.85      0.86       180
+    B-PER       0.95      0.96      0.95       300
+    I-PER       0.94      0.93      0.93       270
+    B-LOC       0.90      0.88      0.89       220
+    I-LOC       0.86      0.85      0.85       190
+      O         0.99      0.99      0.99      5000
+----------------------------------------------------
+   accuracy                          0.98      7000
+  macro avg       0.92      0.91      0.91  
+weighted avg      0.98      0.98      0.98  
+🚀 Summary of Steps
+1️⃣ Run trainer.predict() on test data.
+2️⃣ Convert logits to class labels (np.argmax(predictions, axis=2)).
+3️⃣ Map back to original labels, ignoring padding (-100).
+4️⃣ Use seqeval.classification_report() to compute Precision, Recall, and F1-score.
+
+Let me know if you need help debugging! 🚀
