@@ -680,3 +680,69 @@ weighted avg      0.98      0.98      0.98
 4️⃣ Use seqeval.classification_report() to compute Precision, Recall, and F1-score.
 
 Let me know if you need help debugging! 🚀
+####
+To evaluate the training data performance, follow similar steps as for the test data. The main difference is that we run trainer.predict() on the training dataset instead of the test dataset.
+
+1️⃣ Generate Predictions on Training Set
+Run the following code to get model predictions on the training set:
+
+python
+Copy
+Edit
+predictions, labels, _ = trainer.predict(train_dataset)
+
+# Convert logits to predicted label indices
+predictions = np.argmax(predictions, axis=2)
+2️⃣ Convert Predictions & Labels to Original Format
+Since padding tokens are labeled as -100, we need to remove them and map indices back to labels.
+
+python
+Copy
+Edit
+# Convert IDs to labels
+true_labels = [[id2label[label] for label in label_row if label != -100] for label_row in labels]
+pred_labels = [[id2label[pred] for pred, label in zip(pred_row, label_row) if label != -100] 
+               for pred_row, label_row in zip(predictions, labels)]
+3️⃣ Compute Performance Metrics
+Use seqeval to generate a classification report for training data.
+
+python
+Copy
+Edit
+from seqeval.metrics import classification_report
+
+print("Training Data Performance:")
+print(classification_report(true_labels, pred_labels))
+🚀 Expected Output
+The output will include precision, recall, and F1-score for each entity type, as well as the overall accuracy.
+
+less
+Copy
+Edit
+Training Data Performance:
+              precision    recall  f1-score   support
+    B-ORG       0.95      0.94      0.94       1000
+    I-ORG       0.92      0.91      0.91        800
+    B-PER       0.98      0.97      0.98       1200
+    I-PER       0.96      0.96      0.96       1100
+    B-LOC       0.94      0.93      0.93       900
+    I-LOC       0.91      0.90      0.91        850
+      O         0.99      0.99      0.99      20000
+-----------------------------------------------------
+   accuracy                          0.99      25000
+  macro avg       0.95      0.94      0.94  
+weighted avg      0.99      0.99      0.99  
+🔍 Key Takeaways
+1️⃣ Use trainer.predict(train_dataset) to evaluate training data.
+2️⃣ Convert logits to class labels (np.argmax(predictions, axis=2)).
+3️⃣ Map back to original entity labels, ignoring padding (-100).
+4️⃣ Use seqeval.classification_report() to compute metrics.
+
+If training accuracy is very high, but test accuracy is much lower, it indicates overfitting. Let me know if you need tuning tips! 🚀
+
+
+
+
+
+
+
