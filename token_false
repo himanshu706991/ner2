@@ -346,3 +346,78 @@ Contains NaN? False
 Now, your model will not fail due to missing values! 🚀🎯
 
 Let me know if you face any other issues! 🔥
+##############
+
+Index error: target 19 is out of bound while execution 
+
+ChatGPT said:
+The IndexError: target 19 is out of bounds typically occurs due to a mismatch between the number of labels and the model's expected number of classes. This happens when:
+
+num_labels in BERT is incorrect
+
+If num_labels is set incorrectly (e.g., 19 when there are fewer unique labels), the model tries to index out of bounds.
+Wrong label indexing in label2id mapping
+
+If some labels have indices greater than num_labels - 1, this error occurs.
+🔹 Fix 1: Check num_labels in Model
+python
+Copy
+Edit
+num_labels = len(label2id)  # Ensure the correct number of labels
+model = BertForTokenClassification.from_pretrained(model_name, num_labels=num_labels)
+🔹 Fix 2: Verify Label Indexing
+Ensure all label indices are within bounds:
+
+python
+Copy
+Edit
+# Check max label index
+max_label_index = max(label2id.values())
+print(f"Max label index: {max_label_index}, Expected: {num_labels-1}")  
+
+# Ensure all labels are within bounds
+for _, labels in data:
+    for label in labels:
+        if label2id[label] >= num_labels:
+            print(f"⚠️ Label '{label}' has index {label2id[label]}, which exceeds {num_labels - 1}")
+If there are labels greater than num_labels - 1, fix the mapping:
+
+python
+Copy
+Edit
+label2id = {label: i for i, label in enumerate(sorted(set(merged_df["tag"].dropna())))}
+id2label = {i: label for label, i in label2id.items()}
+
+num_labels = len(label2id)  # Recalculate
+🔹 Fix 3: Ensure labels Align with Tokenization
+While tokenizing, subword tokens may cause misalignment. Ensure labels match subwords:
+
+python
+Copy
+Edit
+encoding = tokenizer(tokens, is_split_into_words=True, truncation=True, padding="max_length", max_length=128, return_tensors="pt")
+word_ids = encoding.word_ids()
+
+# Assign labels properly
+label_ids = []
+previous_word_idx = None
+for word_idx in word_ids:
+    if word_idx is None:
+        label_ids.append(-100)  # Ignore padding
+    elif word_idx != previous_word_idx:
+        label_ids.append(label2id.get(labels[word_idx], 0))  # Assign correct label
+    else:
+        label_ids.append(-100)  # Ignore subwords
+    previous_word_idx = word_idx
+
+# Ensure label_ids do not exceed num_labels
+if any(l >= num_labels for l in label_ids if l != -100):
+    print("⚠️ Label index out of bounds detected!")
+🔹 Final Step: Retrain Model
+After applying the fixes, retrain the model:
+
+python
+Copy
+Edit
+trainer.train()
+This should fix the IndexError! 🚀 Let me know if you need more help! 🎯
