@@ -2197,6 +2197,119 @@ Check if your labels align correctly with tokens.
 If using subwords (e.g., "running" → ["run", "##ning"]), ensure -100 is used for subword parts.
 Let me know what output you get! 🚀
 
+####
+The error "text input must be type 'str'" happens because the tokenizer is expecting either a single string or a list of pre-tokenized words, but it is receiving an incorrect format.
+
+🔹 Step-by-Step Fix
+1️⃣ Debug: Check Your Token List Before Tokenization
+Before calling the tokenizer, print the tokens list:
+
+python
+Copy
+Edit
+for idx, (tokens, labels) in enumerate(data[:3]):  # Checking first 3 examples
+    print(f"Example {idx+1}:")
+    print("Tokens:", tokens)
+    print("Labels:", labels)
+    print("Type of Tokens:", type(tokens))
+    print("Are tokens a list of strings?", all(isinstance(t, str) for t in tokens))
+    print("-" * 50)
+🔹 Expected Output Format
+Each tokens list should be a list of strings:
+
+pgsql
+Copy
+Edit
+Example 1:
+Tokens: ['A', 'system', 'failure', 'occurred', '.']
+Labels: ['O', 'B-FAILURE', 'I-FAILURE', 'O', 'O']
+Type of Tokens: <class 'list'>
+Are tokens a list of strings? True
+--------------------------------------------------
+✅ If the output is NOT in this format:
+If tokens is a nested list (e.g., [["A", "system"], ["failure", "occurred"]]), flatten it:
+python
+Copy
+Edit
+tokens = [word for sublist in tokens for word in sublist]
+If tokens is not a list at all, check how data is structured.
+2️⃣ Fix Tokenization in Dataset Class
+Update your NERDataset class to ensure correct token input:
+
+python
+Copy
+Edit
+class NERDataset(Dataset):
+    def __init__(self, data, tokenizer, label2id, max_len=128):
+        self.data = data
+        self.tokenizer = tokenizer
+        self.label2id = label2id
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        tokens, labels = self.data[idx]
+
+        # 🔹 Fix: Ensure tokens are a list of strings, NOT nested lists or non-string types
+        if isinstance(tokens[0], list):
+            tokens = [word for sublist in tokens for word in sublist]
+        if not all(isinstance(t, str) for t in tokens):
+            raise ValueError(f"Tokens must be a list of strings, got: {tokens}")
+
+        # 🔹 Tokenization
+        encoding = self.tokenizer(
+            tokens,
+            is_split_into_words=True,  # IMPORTANT: Ensures word alignment
+            truncation=True,
+            padding="max_length",
+            max_length=self.max_len,
+            return_tensors="pt"
+        )
+
+        # 🔹 Map Labels to Tokenized Words
+        word_ids = encoding.word_ids()
+        label_ids = []
+        previous_word_idx = None
+
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore padding tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(self.label2id.get(labels[word_idx], 0))  # Assign label
+            else:
+                label_ids.append(-100)  # Ignore subwords
+            previous_word_idx = word_idx
+
+        encoding["labels"] = torch.tensor(label_ids)
+
+        return {key: val.squeeze(0) for key, val in encoding.items()}
+3️⃣ Test Before Training
+Before training, test a batch from DataLoader:
+
+python
+Copy
+Edit
+train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+
+for batch in train_loader:
+    print("Input Tokens:", tokenizer.convert_ids_to_tokens(batch["input_ids"][0].tolist()))
+    print("Labels:", batch["labels"][0].tolist())
+    break  # Print only the first batch
+✅ If this runs correctly, you can now train the model:
+
+python
+Copy
+Edit
+trainer.train()
+🔹 Summary
+Ensure tokens are a list of strings.
+Fix NERDataset class to handle subwords correctly.
+Debug using print statements before training.
+Test with DataLoader before calling trainer.train().
+Try this out and let me know what you get! 🚀
+
 
 
 
