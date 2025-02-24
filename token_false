@@ -199,3 +199,150 @@ Copy
 Edit
 trainer.train()
 Let me know if you face any other issues! 🚀🔥
+#######################################
+
+(B) Remove Empty or NaN Tokens   i am getting nan can handle this
+
+ChatGPT said:
+Yes! You need to handle NaN (missing values) properly before tokenizing.
+
+🔹 Fix NaN Tokens in preprocess_tokens
+Modify this before passing data to the dataset:
+
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+
+# 🔹 Function to preprocess tokens and handle NaN values
+def preprocess_tokens(data):
+    cleaned_data = []
+    for tokens, labels in data:
+        # 🔹 Convert NaN to empty strings
+        tokens = ["" if pd.isna(t) or t is None else str(t) for t in tokens]
+        labels = ["O" if pd.isna(l) or l is None else str(l) for l in labels]
+
+        # 🔹 Remove empty tokens
+        tokens, labels = zip(*[(t, l) for t, l in zip(tokens, labels) if t.strip() != ""]) if tokens else ([], [])
+
+        # 🔹 Ensure labels align (default to 'O' if mismatch)
+        if len(labels) != len(tokens):
+            labels = ["O"] * len(tokens)  
+
+        cleaned_data.append((list(tokens), list(labels)))
+    
+    return cleaned_data
+
+# 🔹 Apply preprocessing
+data = preprocess_tokens(data)
+🔹 Step 2: Verify Fix
+Run this after preprocessing:
+
+python
+Copy
+Edit
+for idx, (tokens, labels) in enumerate(data[:5]):  
+    print(f"✅ Example {idx+1}:")
+    print("Tokens:", tokens)
+    print("Labels:", labels)
+    print("Are all tokens strings?", all(isinstance(t, str) for t in tokens))
+    print("Contains NaN?", any(pd.isna(t) for t in tokens))  # Should be False now
+    print("-" * 50)
+✅ Expected Output
+sql
+Copy
+Edit
+✅ Example 1:
+Tokens: ['A', 'system', 'failure', 'occurred', '.']
+Labels: ['O', 'B-FAILURE', 'I-FAILURE', 'O', 'O']
+Are all tokens strings? True
+Contains NaN? False
+--------------------------------------------------
+✅ Example 2:
+Tokens: ['The', 'server', 'was', 'down', 'unexpectedly', '.']
+Labels: ['O', 'B-ISSUE', 'O', 'O', 'O', 'O']
+Are all tokens strings? True
+Contains NaN? False
+--------------------------------------------------
+If you get Contains NaN? False for all cases, your issue is fixed! 🚀🎯
+
+Now, continue with:
+
+python
+Copy
+Edit
+trainer.train()
+Let me know if you face any other issues! 🚀🔥
+
+
+
+
+
+
+You said:
+can it handle small nan
+ChatGPT said:
+Yes! The updated function handles NaN values correctly—including cases where NaN appears as "nan", None, or pd.NA.
+
+🔹 Fix for Small "nan" or Empty Tokens
+Modify the preprocess_tokens function to handle all cases:
+
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+
+def preprocess_tokens(data):
+    cleaned_data = []
+    for tokens, labels in data:
+        # 🔹 Convert all tokens to strings and handle NaN (pd.NA, np.nan, None, "nan")
+        tokens = ["" if pd.isna(t) or t in ["nan", None] else str(t) for t in tokens]
+        labels = ["O" if pd.isna(l) or l in ["nan", None] else str(l) for l in labels]
+
+        # 🔹 Remove empty tokens (including small 'nan' or empty strings)
+        tokens, labels = zip(*[(t, l) for t, l in zip(tokens, labels) if t.strip() != ""]) if tokens else ([], [])
+
+        # 🔹 Ensure labels align (default to 'O' if mismatch)
+        if len(labels) != len(tokens):
+            labels = ["O"] * len(tokens)
+
+        cleaned_data.append((list(tokens), list(labels)))
+    
+    return cleaned_data
+
+# 🔹 Apply preprocessing
+data = preprocess_tokens(data)
+🔹 Step 2: Verify Fix
+Run this test after preprocessing:
+
+python
+Copy
+Edit
+for idx, (tokens, labels) in enumerate(data[:5]):  
+    print(f"✅ Example {idx+1}:")
+    print("Tokens:", tokens)
+    print("Labels:", labels)
+    print("Are all tokens strings?", all(isinstance(t, str) for t in tokens))
+    print("Contains NaN?", any(pd.isna(t) or t == "nan" or t == "" for t in tokens))  # Should be False now
+    print("-" * 50)
+✅ Expected Output
+sql
+Copy
+Edit
+✅ Example 1:
+Tokens: ['A', 'system', 'failure', 'occurred', '.']
+Labels: ['O', 'B-FAILURE', 'I-FAILURE', 'O', 'O']
+Are all tokens strings? True
+Contains NaN? False
+--------------------------------------------------
+✅ Example 2:
+Tokens: ['The', 'server', 'was', 'down', 'unexpectedly', '.']
+Labels: ['O', 'B-ISSUE', 'O', 'O', 'O', 'O']
+Are all tokens strings? True
+Contains NaN? False
+--------------------------------------------------
+Now, your model will not fail due to missing values! 🚀🎯
+
+Let me know if you face any other issues! 🔥
