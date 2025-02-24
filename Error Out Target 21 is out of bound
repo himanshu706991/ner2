@@ -1,0 +1,275 @@
+ You're getting the "Text input must be str" error because tokenizer(sample["input_ids"].tolist(), return_tensors="pt").word_ids() is incorrect. The input_ids are already tokenized IDs, and the word_ids() method is only available when you tokenize raw text (not token IDs).
+
+🔹 Correct Way to Debug Tokenization
+Instead of calling .word_ids() on tokenized IDs, you should decode them properly.
+
+✅ Fix: Print Tokenized Output with Labels
+python
+Copy
+Edit
+sample = train_dataset[0]  # Get the first sample
+
+tokens = sample["input_ids"].tolist()  # Get token IDs
+decoded_tokens = tokenizer.convert_ids_to_tokens(tokens)  # Convert IDs to tokens
+labels = sample["labels"].tolist()  # Get label IDs
+
+print("Tokens:", decoded_tokens)
+print("Labels:", labels)
+print("Decoded Sentence:", tokenizer.decode(tokens, skip_special_tokens=True))  # Proper way to decode text
+🔹 Explanation
+.convert_ids_to_tokens(tokens) → Converts token IDs back to actual words/subwords
+.decode(tokens, skip_special_tokens=True) → Converts token IDs back to a readable sentence
+word_ids() only works during tokenization, so you cannot use it on input_ids.
+🔍 If You Want Word IDs for Debugging
+To check how words are split into subwords, call word_ids() during tokenization, like this:
+
+python
+Copy
+Edit
+tokens = ["Hello", "world", "this", "is", "a", "test"]
+encoding = tokenizer(tokens, is_split_into_words=True, return_tensors="pt", padding="max_length", max_length=10)
+
+print("Word IDs:", encoding.word_ids())  # Word mapping
+print("Tokens:", tokenizer.convert_ids_to_tokens(encoding["input_ids"].tolist()[0]))  # Check subwords
+✅ Final Fix Summary
+Use .convert_ids_to_tokens() to check tokenized words.
+Use .decode() to reconstruct the full sentence.
+Call .word_ids() only during tokenization, not on input_ids.
+Now, your debugging step should work correctly. 🚀 Let me know if you need more help!
+
+
+
+
+
+
+You said:
+now i am geeting Target 21 is out of bound
+ChatGPT said:
+You're getting the error "Target 21 is out of bound" because your label IDs are exceeding the number of classes (num_labels) defined in the model. This typically happens due to:
+
+Mismatch in Label Encoding → Some labels might not be mapped correctly.
+Indexing Issues with word_ids() → Some tokens may not have corresponding labels.
+Wrong Padding Handling (-100) → Padding tokens should have -100, but they might have an invalid label index.
+🔹 Step-by-Step Fix
+✅ 1. Print label2id Mapping
+Ensure the label mapping is correct.
+
+python
+Copy
+Edit
+print("Label Mapping:", label2id)
+print("Total Labels:", len(label2id))
+This should match num_labels in the model.
+
+✅ 2. Fix label_ids Assignment
+Modify the loop inside __getitem__() in NERDataset:
+
+python
+Copy
+Edit
+label_ids = []
+previous_word_idx = None
+
+for word_idx in word_ids:
+    if word_idx is None:
+        label_ids.append(-100)  # Ignore padding tokens
+    elif word_idx != previous_word_idx:
+        label_ids.append(label2id.get(labels[word_idx], 0))  # Assign label or O (default)
+    else:
+        label_ids.append(-100)  # Ignore subword tokens
+
+    previous_word_idx = word_idx
+
+# Ensure labels are within the valid range
+label_ids = [label if label < len(label2id) else 0 for label in label_ids]  # Fix out-of-bound error
+
+encoding["labels"] = torch.tensor(label_ids)
+✅ 3. Debug Individual Samples
+Add this before returning the dataset sample:
+
+python
+Copy
+Edit
+print("Tokens:", tokenizer.convert_ids_to_tokens(encoding["input_ids"].tolist()))
+print("Word IDs:", word_ids)
+print("Original Labels:", labels)
+print("Mapped Label IDs:", label_ids)
+print("Max Label ID:", max(label_ids))  # Ensure it's within bounds
+✅ 4. Ensure num_labels Matches Label Count
+When loading BERT:
+
+python
+Copy
+Edit
+num_labels = len(label2id)  # Ensure it matches the label count
+model = BertForTokenClassification.from_pretrained("bert-base-uncased", num_labels=num_labels)
+Final Fix Summary
+Verify label2id dictionary → Check that all labels are mapped properly.
+Fix indexing in __getitem__() → Ensure labels do not exceed num_labels.
+Clip out-of-bound labels → Use label if label < len(label2id) else 0.
+Print debug information → Validate tokenization, word IDs, and labels.
+Ensure num_labels matches label2id count → Prevents mismatch with model expectations.
+This should resolve the "Target out of bound" issue! 🚀 Let me know if you need further clarification.
+
+
+
+
+
+
+You said:
+rint("Tokens:", tokenizer.convert_ids_to_tokens(encoding["input_ids"].tolist())) gettomg error int cant in to str
+ChatGPT said:
+The error "int can't be converted to str" occurs because encoding["input_ids"] is a tensor, and tokenizer.convert_ids_to_tokens() expects a list of integers instead of a tensor.
+
+🔹 Fix the Error
+Modify your print statement to convert the tensor to a list properly:
+
+python
+Copy
+Edit
+print("Tokens:", tokenizer.convert_ids_to_tokens(encoding["input_ids"].tolist()))
+🔺 Problem: encoding["input_ids"].tolist() still contains tensors inside lists.
+
+🔹 Fix: Extract the first tensor and convert it into a list.
+
+python
+Copy
+Edit
+print("Tokens:", tokenizer.convert_ids_to_tokens(encoding["input_ids"][0].tolist()))
+✅ Now it should work without errors! 🚀
+
+
+
+
+
+
+You said:
+Target 21 is out of bound while training fix this
+ChatGPT said:
+The "Target 21 is out of bound" error happens because one of your labels has an index that exceeds the number of labels in BertForTokenClassification.
+
+🔹 Steps to Fix This Issue
+Check label2id Mapping
+Ensure that label2id is correctly mapped and does not have out-of-range values.
+
+Verify Maximum Label Index
+Your model should have num_labels = len(label2id).
+If the model expects N labels, your target labels must be between 0 and N-1.
+
+Print Label Values Before Training
+
+python
+Copy
+Edit
+print("Unique label IDs:", set(label2id.values()))
+print("Max label index:", max(label2id.values()))
+Fix label_ids.append(label2id.get(labels[word_idx], 0))
+
+Add a check to ensure word_idx exists before accessing labels[word_idx].
+Handle out-of-range indices.
+python
+Copy
+Edit
+if word_idx is not None and word_idx < len(labels):
+    label_ids.append(label2id.get(labels[word_idx], 0))  # Assign label or 'O'
+else:
+    label_ids.append(-100)  # Ignore invalid indices
+Confirm Model is Initialized Properly Ensure that your model's num_labels matches the number of unique labels:
+
+python
+Copy
+Edit
+model = BertForTokenClassification.from_pretrained(model_name, num_labels=len(label2id))
+print("Number of labels in the model:", len(label2id))
+🔹 Final Fix in Your Code
+Modify the dataset processing code like this:
+
+python
+Copy
+Edit
+label_ids = []
+for word_idx in word_ids:
+    if word_idx is None:
+        label_ids.append(-100)  # Ignore padding tokens
+    elif word_idx < len(labels):  # Ensure index is within range
+        label_ids.append(label2id.get(labels[word_idx], 0))
+    else:
+        label_ids.append(-100)  # Ignore invalid indices
+✅ Now your model should train without "Target X is out of bound" errors! 🚀
+
+
+
+
+
+
+You said:
+why this error reason behind Target 21 is out of bound
+ChatGPT said:
+🔍 Reason Behind "Target 21 is out of bound" Error
+This error happens when your model expects a label index within a certain range, but the dataset provides an out-of-range label.
+
+📌 Main Causes
+1️⃣ label2id Mapping Issue
+Your model expects label indices from 0 to num_labels-1`.
+But some labels in your dataset map to a higher index than num_labels.
+Example:
+python
+Copy
+Edit
+label2id = {'O': 0, 'B-PER': 1, 'I-PER': 2, 'B-ORG': 3, 'I-ORG': 4}
+If a dataset label maps to 21, but the model only supports 5 labels (0-4), you get:
+csharp
+Copy
+Edit
+IndexError: Target 21 is out of bound
+2️⃣ Missing Labels Handling
+If your dataset has NaN or unexpected labels, they may be assigned a random number.
+Example:
+python
+Copy
+Edit
+label2id.get("UNKNOWN_LABEL", 21)  # This assigns an out-of-range index!
+3️⃣ Tokenization Mismatch (word_ids() Issues)
+Your tokenizer splits words into subwords (e.g., NewYork → ["New", "##York"]).
+Your labels list may have fewer elements than tokens.
+Example:
+python
+Copy
+Edit
+tokens = ["New", "##York", "is", "great"]
+labels = ["B-LOC", "O", "O"]  # 🚨 Missing a label for "##York"
+If you try to access labels[word_idx] for "##York", you'll get out of range errors.
+4️⃣ Incorrect num_labels in Model
+If you load BertForTokenClassification with num_labels=5 but your dataset has labels mapped up to 21, it will crash.
+✅ How to Fix It?
+🔹 1. Print label2id to Ensure Correct Mapping
+python
+Copy
+Edit
+print("Label2ID Mapping:", label2id)
+print("Max label index:", max(label2id.values()))
+print("Num labels expected by model:", len(label2id))
+If max(label2id.values()) >= num_labels, you must adjust num_labels.
+
+🔹 2. Fix Label Indexing in Dataset
+Modify this section:
+
+python
+Copy
+Edit
+if word_idx is not None and word_idx < len(labels):
+    label_ids.append(label2id.get(labels[word_idx], 0))  # Assign valid label
+else:
+    label_ids.append(-100)  # Ignore padding and invalid indices
+This prevents index errors from labels[word_idx].
+
+🔹 3. Ensure num_labels Matches label2id
+python
+Copy
+Edit
+model = BertForTokenClassification.from_pretrained(model_name, num_labels=len(label2id))
+🚀 Final Fix
+Check label mapping
+Fix out-of-range indexing
+Match num_labels to label dictionary
+Now your model should train without the "Target 21 is out of bound" error!
