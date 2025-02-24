@@ -313,3 +313,64 @@ python
 Copy
 Edit
 trainer.train()
+###
+Step-by-Step Fix
+✅ 1. Print label2id Mapping
+Ensure the label mapping is correct.
+
+python
+Copy
+Edit
+print("Label Mapping:", label2id)
+print("Total Labels:", len(label2id))
+This should match num_labels in the model.
+
+✅ 2. Fix label_ids Assignment
+Modify the loop inside __getitem__() in NERDataset:
+
+python
+Copy
+Edit
+label_ids = []
+previous_word_idx = None
+
+for word_idx in word_ids:
+    if word_idx is None:
+        label_ids.append(-100)  # Ignore padding tokens
+    elif word_idx != previous_word_idx:
+        label_ids.append(label2id.get(labels[word_idx], 0))  # Assign label or O (default)
+    else:
+        label_ids.append(-100)  # Ignore subword tokens
+
+    previous_word_idx = word_idx
+
+# Ensure labels are within the valid range
+label_ids = [label if label < len(label2id) else 0 for label in label_ids]  # Fix out-of-bound error
+
+encoding["labels"] = torch.tensor(label_ids)
+✅ 3. Debug Individual Samples
+Add this before returning the dataset sample:
+
+python
+Copy
+Edit
+print("Tokens:", tokenizer.convert_ids_to_tokens(encoding["input_ids"].tolist()))
+print("Word IDs:", word_ids)
+print("Original Labels:", labels)
+print("Mapped Label IDs:", label_ids)
+print("Max Label ID:", max(label_ids))  # Ensure it's within bounds
+✅ 4. Ensure num_labels Matches Label Count
+When loading BERT:
+
+python
+Copy
+Edit
+num_labels = len(label2id)  # Ensure it matches the label count
+model = BertForTokenClassification.from_pretrained("bert-base-uncased", num_labels=num_labels)
+Final Fix Summary
+Verify label2id dictionary → Check that all labels are mapped properly.
+Fix indexing in __getitem__() → Ensure labels do not exceed num_labels.
+Clip out-of-bound labels → Use label if label < len(label2id) else 0.
+Print debug information → Validate tokenization, word IDs, and labels.
+Ensure num_labels matches label2id count → Prevents mismatch with model expectations.
+This should resolve the "Target out of bound" issue! 🚀 Let me know if you need further clarification.
