@@ -1,0 +1,201 @@
+Since you are getting False for some tokens, it means that there are incorrect data formats (e.g., numbers, NaN values, or nested lists).
+
+🔹 Step 1: Identify Problematic Tokens
+Run this code to find tokens that are NOT strings:
+
+python
+Copy
+Edit
+for idx, (tokens, labels) in enumerate(data):
+    if not all(isinstance(t, str) for t in tokens):
+        print(f"⚠️ Issue at Example {idx+1}:")
+        print("Tokens:", tokens)
+        print("Labels:", labels)
+        print("Types:", [type(t) for t in tokens])
+        print("-" * 50)
+✅ Expected Output
+All tokens should be strings. If you see lists, numbers, or NaN values, we need to fix them.
+
+🔹 Step 2: Fix Non-String Tokens
+Modify this part of your preprocessing:
+
+(A) Convert Non-Strings to Strings
+If numbers exist (e.g., 123 instead of "123"), convert them:
+
+python
+Copy
+Edit
+tokens = [str(t) if not isinstance(t, str) else t for t in tokens]
+(B) Remove Empty or NaN Tokens
+If NaN or empty tokens exist, remove them:
+
+python
+Copy
+Edit
+tokens = [t for t in tokens if isinstance(t, str) and t.strip() != ""]
+(C) Flatten Nested Lists
+If tokens are nested lists, flatten them:
+
+python
+Copy
+Edit
+tokens = [word for sublist in tokens for word in sublist] if isinstance(tokens[0], list) else tokens
+🔹 Step 3: Apply Fix in NERDataset
+Modify the __getitem__ function in NERDataset:
+
+python
+Copy
+Edit
+class NERDataset(Dataset):
+    def __init__(self, data, tokenizer, label2id, max_len=128):
+        self.data = data
+        self.tokenizer = tokenizer
+        self.label2id = label2id
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        tokens, labels = self.data[idx]
+
+        # 🔹 Fix: Convert non-strings, remove NaN, flatten lists
+        tokens = [str(t) if not isinstance(t, str) else t for t in tokens]
+        tokens = [t for t in tokens if t.strip() != ""]
+        tokens = [word for sublist in tokens for word in sublist] if isinstance(tokens[0], list) else tokens
+
+        if not all(isinstance(t, str) for t in tokens):
+            raise ValueError(f"❌ Invalid tokens detected at index {idx}: {tokens}")
+
+        # 🔹 Tokenization
+        encoding = self.tokenizer(
+            tokens,
+            is_split_into_words=True,  # IMPORTANT: Ensures word alignment
+            truncation=True,
+            padding="max_length",
+            max_length=self.max_len,
+            return_tensors="pt"
+        )
+
+        # 🔹 Map Labels to Tokenized Words
+        word_ids = encoding.word_ids()
+        label_ids = []
+        previous_word_idx = None
+
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore padding tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(self.label2id.get(labels[word_idx], 0))  # Assign label
+            else:
+                label_ids.append(-100)  # Ignore subwords
+            previous_word_idx = word_idx
+
+        encoding["labels"] = torch.tensor(label_ids)
+
+        return {key: val.squeeze(0) for key, val in encoding.items()}
+🔹 Step 4: Test Again
+Run this check after preprocessing:
+
+python
+Copy
+Edit
+for idx, (tokens, labels) in enumerate(data[:5]):  
+    print(f"✅ Example {idx+1}:")
+    print("Tokens:", tokens)
+    print("Labels:", labels)
+    print("Are tokens all strings?", all(isinstance(t, str) for t in tokens))
+    print("-" * 50)
+✅ If all True, the issue is fixed!
+
+🔹 Step 5: Continue Training
+If no errors appear, continue training:
+
+python
+Copy
+Edit
+trainer.train()
+🔹 Summary
+Identify problematic tokens (run step 1).
+Convert non-strings, remove NaN, and flatten lists (step 2).
+Fix the dataset class to handle these cases (step 3).
+Test the dataset before training (step 4).
+Resume training if all issues are fixed (step 5).
+Try these fixes and let me know if you still see issues! 🚀
+
+
+
+
+
+
+You said:
+can u convert so that i will get True for the token
+ChatGPT said:
+Yes! I'll modify your dataset processing to ensure all tokens are valid strings and print verification results.
+
+🔹 Step 1: Fix Token Preprocessing
+Modify this before passing data to the dataset:
+
+python
+Copy
+Edit
+# 🔹 Convert all tokens to strings and fix issues
+def preprocess_tokens(data):
+    cleaned_data = []
+    for tokens, labels in data:
+        # 🔹 Convert non-strings to strings
+        tokens = [str(t) if not isinstance(t, str) else t for t in tokens]
+
+        # 🔹 Remove empty or NaN tokens
+        tokens = [t for t in tokens if t.strip() != ""]
+
+        # 🔹 Flatten nested lists (if any)
+        if isinstance(tokens[0], list):
+            tokens = [word for sublist in tokens for word in sublist]
+
+        # 🔹 Ensure labels align (use 'O' if missing)
+        if len(labels) != len(tokens):
+            labels = ["O"] * len(tokens)  # Assign 'O' for missing labels
+
+        cleaned_data.append((tokens, labels))
+    
+    return cleaned_data
+
+# 🔹 Apply preprocessing
+data = preprocess_tokens(data)
+🔹 Step 2: Verify Tokens Are All Strings
+Now, run this check:
+
+python
+Copy
+Edit
+for idx, (tokens, labels) in enumerate(data[:5]):  
+    print(f"✅ Example {idx+1}:")
+    print("Tokens:", tokens)
+    print("Labels:", labels)
+    print("Are all tokens strings?", all(isinstance(t, str) for t in tokens))
+    print("-" * 50)
+✅ Expected Output
+sql
+Copy
+Edit
+✅ Example 1:
+Tokens: ['A', 'system', 'failure', 'occurred', '.']
+Labels: ['O', 'B-FAILURE', 'I-FAILURE', 'O', 'O']
+Are all tokens strings? True
+--------------------------------------------------
+✅ Example 2:
+Tokens: ['This', 'is', 'a', 'test', 'sentence', '.']
+Labels: ['O', 'O', 'O', 'O', 'B-TEST', 'O']
+Are all tokens strings? True
+--------------------------------------------------
+If you get True for all cases, then your issue is fixed! 🚀
+
+🔹 Step 3: Train Model
+Once everything is verified, continue with:
+
+python
+Copy
+Edit
+trainer.train()
+Let me know if you face any other issues! 🚀🔥
