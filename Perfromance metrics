@@ -795,3 +795,229 @@ Higher batch size (8 → 16)
 Lower learning rate (5e-5 → 3e-5)
 📌 4. Visualize Incorrect Predictions (Optional)
 Would you like a heatmap of errors, a confusion matrix, or something else? Let me know! 🚀
+
+############
+
+
+It looks like classification_report from sklearn.metrics is not defined. Try adding this import at the beginning of your script:
+
+python
+Copy
+Edit
+from sklearn.metrics import classification_report
+Then, ensure the evaluate_model function is properly called after training completes. Here’s a step-by-step process:
+
+🔹 Step 1: Compute Predictions & Metrics
+python
+Copy
+Edit
+import numpy as np
+from sklearn.metrics import classification_report
+
+def evaluate_model(dataset, dataset_name):
+    predictions, labels, _ = trainer.predict(dataset)
+
+    # Convert logits to label indices
+    predictions = np.argmax(predictions, axis=2)
+
+    # Convert indices to actual labels
+    true_labels = [[id2label[l] for l in label_seq if l != -100] for label_seq in labels]
+    predicted_labels = [[id2label[p] for p, l in zip(pred_seq, label_seq) if l != -100] for pred_seq, label_seq in zip(predictions, labels)]
+
+    # Flatten lists for sklearn metrics
+    flat_true_labels = [label for sublist in true_labels for label in sublist]
+    flat_pred_labels = [label for sublist in predicted_labels for label in sublist]
+
+    # Compute classification report
+    report = classification_report(flat_true_labels, flat_pred_labels, digits=4)
+    print(f"📊 Performance Report for {dataset_name}:\n", report)
+
+# Evaluate performance on both train and test sets
+evaluate_model(train_dataset, "Train")
+evaluate_model(test_dataset, "Test")
+🔹 Step 2: Save Results to CSV
+python
+Copy
+Edit
+import pandas as pd
+
+def save_predictions(dataset, dataset_name):
+    predictions, labels, _ = trainer.predict(dataset)
+    predictions = np.argmax(predictions, axis=2)
+
+    # Convert labels back to original format
+    true_labels = [[id2label[l] for l in label_seq if l != -100] for label_seq in labels]
+    predicted_labels = [[id2label[p] for p, l in zip(pred_seq, label_seq) if l != -100] for pred_seq, label_seq in zip(predictions, labels)]
+    
+    # Flatten lists
+    flat_tokens = [tokenizer.convert_ids_to_tokens(sample["input_ids"]) for sample in dataset]
+    flat_true_labels = [label for sublist in true_labels for label in sublist]
+    flat_pred_labels = [label for sublist in predicted_labels for label in sublist]
+
+    # Save as CSV
+    df = pd.DataFrame({"Token": flat_tokens, "Actual_Label": flat_true_labels, "Predicted_Label": flat_pred_labels})
+    df.to_csv(f"{dataset_name}_predictions.csv", index=False)
+    print(f"✅ Predictions saved in {dataset_name}_predictions.csv")
+
+save_predictions(train_dataset, "Train")
+save_predictions(test_dataset, "Test")
+🔹 Step 3: Fix "metrics not defined" Error
+If you see:
+
+pgsql
+Copy
+Edit
+NameError: name 'metrics' is not defined
+Make sure you import sklearn.metrics:
+
+python
+Copy
+Edit
+from sklearn import metrics
+Also, check that classification_report is properly used.
+
+Let me know if you get any errors! 🚀
+
+
+
+
+
+
+You said:
+compute metrics is not define
+ChatGPT said:
+If you're getting an error like:
+
+pgsql
+Copy
+Edit
+NameError: name 'compute_metrics' is not defined
+It means that the function compute_metrics is missing. You need to define it before passing it to the Trainer.
+
+🔹 Step 1: Define compute_metrics Function
+Add this function to your script before initializing the Trainer:
+
+python
+Copy
+Edit
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+
+def compute_metrics(pred):
+    labels = pred.label_ids
+    preds = np.argmax(pred.predictions, axis=2)
+
+    # Remove ignored index (-100) and flatten lists
+    true_labels = [l for label in labels for l in label if l != -100]
+    pred_labels = [p for pred in preds for p, l in zip(pred, label) if l != -100]
+
+    # Compute precision, recall, f1-score, and accuracy
+    precision, recall, f1, _ = precision_recall_fscore_support(true_labels, pred_labels, average="weighted")
+    accuracy = accuracy_score(true_labels, pred_labels)
+
+    return {
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1
+    }
+🔹 Step 2: Update Trainer
+Pass this compute_metrics function to the Trainer:
+
+python
+Copy
+Edit
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=test_dataset,
+    compute_metrics=compute_metrics  # Add this line
+)
+🔹 Step 3: Run Training & Evaluation
+Now, when you run:
+
+python
+Copy
+Edit
+trainer.train()
+You will see accuracy, precision, recall, and F1-score printed after each epoch.
+
+To evaluate on the test set:
+
+python
+Copy
+Edit
+trainer.evaluate()
+Let me know if you need any modifications! 🚀
+
+
+
+
+
+
+You said:
+i need train test file with predicted tag like actual vs predicted
+ChatGPT said:
+To generate CSV files containing the actual vs predicted tags for both the train and test datasets, follow these steps:
+
+🔹 Step 1: Define Function to Get Predictions
+We will write a function that:
+
+Runs the trained model on the dataset
+Extracts the actual vs predicted labels
+Saves the results as a CSV file
+python
+Copy
+Edit
+import pandas as pd
+import torch
+import numpy as np
+
+def get_predictions(trainer, dataset, tokenizer, label2id, output_file):
+    id2label = {v: k for k, v in label2id.items()}  # Reverse mapping of labels
+    predictions, labels, _ = trainer.predict(dataset)
+
+    preds = np.argmax(predictions, axis=2)
+
+    data = []
+    for i, (input_ids, label_ids, pred_ids) in enumerate(zip(dataset[:]["input_ids"], labels, preds)):
+        tokens = tokenizer.convert_ids_to_tokens(input_ids)
+        true_labels = [id2label[label] if label != -100 else "IGNORED" for label in label_ids]
+        pred_labels = [id2label[pred] if label != -100 else "IGNORED" for pred, label in zip(pred_ids, label_ids)]
+        
+        for token, actual, predicted in zip(tokens, true_labels, pred_labels):
+            if token not in ["[PAD]", "[CLS]", "[SEP]"]:  # Ignore special tokens
+                data.append([i, token, actual, predicted])
+
+    # Save to CSV
+    df = pd.DataFrame(data, columns=["Sentence_ID", "Token", "Actual_Tag", "Predicted_Tag"])
+    df.to_csv(output_file, index=False)
+    print(f"Predictions saved to {output_file}")
+
+🔹 Step 2: Generate CSV for Train & Test Data
+Run these lines after training the model:
+
+python
+Copy
+Edit
+get_predictions(trainer, train_dataset, tokenizer, label2id, "train_predictions.csv")
+get_predictions(trainer, test_dataset, tokenizer, label2id, "test_predictions.csv")
+🔹 Output Format (CSV)
+The output files (train_predictions.csv & test_predictions.csv) will contain:
+
+Sentence_ID	Token	Actual_Tag	Predicted_Tag
+0	A	O	O
+0	system	B-FAILURE	B-FAILURE
+0	failure	I-FAILURE	I-FAILURE
+0	occurred	O	O
+1	Server	B-LOCATION	B-DEVICE
+...	...	...	...
+🔹 Next Steps
+If predictions are incorrect, you can fine-tune hyperparameters and retrain.
+You can analyze misclassifications using pandas:
+python
+Copy
+Edit
+df = pd.read_csv("test_predictions.csv")
+df[df["Actual_Tag"] != df["Predicted_Tag"]]  # Show misclassified tokens
