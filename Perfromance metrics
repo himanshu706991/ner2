@@ -1090,3 +1090,75 @@ get_predictions(trainer, test_dataset, tokenizer, label2id, "test_predictions.cs
 ✅ Handles Missing or Ignored Labels (-100): Assigns "O" to ignored labels.
 
 This will fix the issue, and you should now get properly formatted Actual vs Predicted CSV files. 🚀
+#############################################################3
+
+
+Too many value to unpack while executing
+
+ChatGPT said:
+The "Too many values to unpack" error typically happens because of how trainer.predict(dataset) returns its output. Let's go step by step to fix this issue.
+
+🔹 Fixing the Error
+Modify the function call as follows:
+
+python
+Copy
+Edit
+def get_predictions(trainer, dataset, tokenizer, label2id, output_file):
+    id2label = {v: k for k, v in label2id.items()}  # Reverse label mapping
+    
+    # 🔹 Trainer.predict() returns a tuple: (predictions, label_ids, metrics)
+    predictions_output = trainer.predict(dataset)
+    predictions = predictions_output.predictions  # Get only the predictions
+    labels = predictions_output.label_ids        # Get actual labels
+
+    preds = np.argmax(predictions, axis=2)  # Convert logits to label indices
+
+    data = []
+    
+    for i, (input_ids, label_ids, pred_ids) in enumerate(zip(dataset[:]["input_ids"], labels, preds)):
+        tokens = tokenizer.convert_ids_to_tokens(input_ids)  # Convert token IDs to words
+        word_ids = dataset[i]["attention_mask"]  # Word alignment from tokenizer
+
+        true_labels = []
+        pred_labels = []
+        valid_tokens = []
+
+        previous_word_idx = None
+        for j, word_idx in enumerate(word_ids):  # Process each token
+            if word_idx is not None and word_idx != previous_word_idx:  # Ignore subword tokens
+                valid_tokens.append(tokens[j])
+                true_labels.append(id2label.get(label_ids[j], "O"))  # Use "O" for ignored labels
+                pred_labels.append(id2label.get(pred_ids[j], "O"))
+            previous_word_idx = word_idx
+
+        # Ensure all lists are the same length
+        if len(valid_tokens) == len(true_labels) == len(pred_labels):
+            for token, actual, predicted in zip(valid_tokens, true_labels, pred_labels):
+                data.append([i, token, actual, predicted])
+        else:
+            print(f"Warning: Mismatch in lengths for sentence {i}")
+
+    # Save to CSV
+    df = pd.DataFrame(data, columns=["Sentence_ID", "Token", "Actual_Tag", "Predicted_Tag"])
+    df.to_csv(output_file, index=False)
+    print(f"Predictions saved to {output_file}")
+
+🔹 Explanation of the Fix
+✅ Corrected unpacking of trainer.predict(dataset)
+
+Instead of using predictions, labels, _ = trainer.predict(dataset), we now access predictions_output.predictions and predictions_output.label_ids.
+✅ Ensured Correct Handling of Predictions & Labels
+
+The predictions output contains logits, which we convert to labels using np.argmax(predictions, axis=2).
+The labels output contains the true label indices.
+✅ Handled Mismatch Between Tokens and Word IDs
+
+We only take the first subword for each token to prevent alignment issues.
+🔹 Run for Train & Test Data
+python
+Copy
+Edit
+get_predictions(trainer, train_dataset, tokenizer, label2id, "train_predictions.csv")
+get_predictions(trainer, test_dataset, tokenizer, label2id, "test_predictions.csv")
+Now you should get Actual vs Predicted CSV files without the "Too many values to unpack" error. 🚀
