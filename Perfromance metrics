@@ -1,0 +1,797 @@
+model is executing now i am want to seethe model results or can hyper parameter the parameter in model.train()
+
+ChatGPT said:
+Great! Now that your model is executing successfully, let's go step by step to:
+
+1️⃣ Evaluate Model Performance (on train and test data)
+2️⃣ View Model Predictions (tokens, labels, subwords)
+3️⃣ Tune Hyperparameters (to improve results)
+
+1️⃣ Evaluate Model Performance
+To measure how well the model is performing, use standard NER evaluation metrics like:
+✔ Precision (How many predicted entities are correct?)
+✔ Recall (How many actual entities were found?)
+✔ F1-Score (Harmonic mean of precision & recall)
+
+📌 Run Evaluation on Test Data:
+
+python
+Copy
+Edit
+from datasets import load_metric
+
+# Load evaluation metric
+metric = load_metric("seqeval")
+
+# Function to compute metrics
+def compute_metrics(p):
+    predictions, labels = p
+    predictions = np.argmax(predictions, axis=2)  # Get highest probability class
+
+    true_predictions = [
+        [id2label[p] for p, l in zip(prediction, label) if l != -100]
+        for prediction, label in zip(predictions, labels)
+    ]
+    true_labels = [
+        [id2label[l] for p, l in zip(prediction, label) if l != -100]
+        for prediction, label in zip(predictions, labels)
+    ]
+
+    results = metric.compute(predictions=true_predictions, references=true_labels)
+    return {
+        "precision": results["overall_precision"],
+        "recall": results["overall_recall"],
+        "f1": results["overall_f1"],
+        "accuracy": results["overall_accuracy"],
+    }
+
+# Evaluate
+eval_results = trainer.evaluate()
+print("Test Set Results:", eval_results)
+2️⃣ View Model Predictions
+To manually check token predictions, print tokens, labels, and subwords:
+
+📌 Print Predictions for a Sample Sentence
+
+python
+Copy
+Edit
+# Sample test example
+sample = test_dataset[0]
+input_ids = sample["input_ids"].unsqueeze(0)  # Add batch dimension
+
+# Get predictions
+model.eval()
+with torch.no_grad():
+    output = model(input_ids)
+logits = output.logits
+predictions = torch.argmax(logits, dim=2)
+
+# Convert IDs to tokens
+tokens = tokenizer.convert_ids_to_tokens(sample["input_ids"])
+predicted_labels = [id2label[p.item()] for p in predictions[0]]
+
+# Print results
+for token, pred in zip(tokens, predicted_labels):
+    print(f"Token: {token}\t Predicted Label: {pred}")
+3️⃣ Hyperparameter Tuning
+To improve performance, adjust these hyperparameters:
+
+Hyperparameter	Default	How to Tune
+learning_rate	5e-5	Try 3e-5, 2e-5 for better performance
+num_train_epochs	3	Increase to 5-10 if model underfits
+per_device_train_batch_size	8	Try 16 or 32 for large datasets
+warmup_steps	0	Try 500 to improve convergence
+📌 Modify Training Arguments
+
+python
+Copy
+Edit
+training_args = TrainingArguments(
+    output_dir="./ner_model",
+    evaluation_strategy="epoch",
+    per_device_train_batch_size=16,  # Increase batch size
+    per_device_eval_batch_size=16,
+    num_train_epochs=5,  # More epochs
+    learning_rate=3e-5,  # Lower learning rate
+    weight_decay=0.01,
+    logging_dir="./logs",
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=test_dataset,
+    compute_metrics=compute_metrics,  # Add metrics function
+)
+
+# Retrain Model with new hyperparameters
+trainer.train()
+✅ Now You Can:
+✔ Evaluate Model Performance
+✔ View Token Predictions
+✔ Tune Hyperparameters to Improve Accuracy
+
+Let me know if you need more insights! 🚀
+
+
+
+
+
+
+You said:
+trainer.train() after this line execution what results i will get i want to see the ouytput
+ChatGPT said:
+What Happens After trainer.train() Execution?
+When you run:
+
+python
+Copy
+Edit
+trainer.train()
+📌 Outputs You Will See:
+1️⃣ Epoch-wise Training Progress
+2️⃣ Loss Value for Each Epoch
+3️⃣ Final Trained Model Ready for Evaluation
+
+1️⃣ Training Progress Output Example
+✅ After execution, you will see logs like this:
+
+shell
+Copy
+Edit
+***** Running training *****
+  Num examples = 8000
+  Num Epochs = 5
+  Instantaneous batch size per device = 16
+  Total train batch size (w. parallel, distributed & accumulation) = 16
+  Gradient Accumulation steps = 1
+  Total optimization steps = 2500
+  20%|█████                  | 500/2500 [01:15<05:00, 6.66 steps/s, loss=0.234]  
+  40%|██████████              | 1000/2500 [02:30<03:45, 6.66 steps/s, loss=0.198]  
+  60%|█████████████          | 1500/2500 [03:45<02:30, 6.66 steps/s, loss=0.145]  
+  80%|█████████████████      | 2000/2500 [05:00<01:15, 6.66 steps/s, loss=0.092]  
+ 100%|███████████████████████| 2500/2500 [06:15<00:00, 6.66 steps/s, loss=0.078]  
+***** Training complete! *****
+📌 What this means:
+
+loss=0.234, 0.198, ... → Loss decreases over epochs
+steps/s → Number of steps per second (training speed)
+Training complete! → Model is now trained and ready
+2️⃣ Check Final Model Performance (Train & Test Accuracy)
+After training, evaluate the model on test data:
+
+📌 Run the Evaluation
+
+python
+Copy
+Edit
+eval_results = trainer.evaluate()
+print("Test Set Results:", eval_results)
+✅ You will see output like:
+
+javascript
+Copy
+Edit
+Test Set Results:
+{'eval_loss': 0.073, 'eval_precision': 0.89, 'eval_recall': 0.87, 'eval_f1': 0.88, 'eval_accuracy': 0.93}
+📌 What this means:
+
+eval_loss = 0.073 → Lower is better
+precision = 89% → Correctly predicted named entities
+recall = 87% → Found most actual named entities
+f1 = 88% → Balanced score
+accuracy = 93% → Overall correct classification
+3️⃣ Check Model Predictions on Sample Sentences
+Now, let’s see model predictions:
+
+python
+Copy
+Edit
+# Pick a sample from test dataset
+sample = test_dataset[0]
+input_ids = sample["input_ids"].unsqueeze(0)
+
+# Get model output
+model.eval()
+with torch.no_grad():
+    output = model(input_ids)
+predictions = torch.argmax(output.logits, dim=2)
+
+# Convert predictions to labels
+tokens = tokenizer.convert_ids_to_tokens(sample["input_ids"])
+predicted_labels = [id2label[p.item()] for p in predictions[0]]
+
+# Print results
+for token, pred in zip(tokens, predicted_labels):
+    print(f"Token: {token}\t Predicted Label: {pred}")
+✅ Example Output:
+
+mathematica
+Copy
+Edit
+Token: [CLS]   Predicted Label: O  
+Token: John    Predicted Label: B-PER  
+Token: Smith   Predicted Label: I-PER  
+Token: lives   Predicted Label: O  
+Token: in      Predicted Label: O  
+Token: New     Predicted Label: B-LOC  
+Token: York    Predicted Label: I-LOC  
+Token: .       Predicted Label: O  
+Token: [SEP]   Predicted Label: O  
+📌 What this means:
+
+"John Smith" → Person (B-PER, I-PER)
+"New York" → Location (B-LOC, I-LOC)
+Other tokens = O (Not an entity)
+✅ Next Steps
+✔ View Training Loss in logs
+✔ Check Evaluation Metrics (trainer.evaluate())
+✔ See Predictions (convert_ids_to_tokens())
+
+Want to tune hyperparameters for better accuracy? Let me know! 🚀
+
+
+
+
+
+
+You said:
+i my case everthing is coming in sigle line i want to see line by line results
+ChatGPT said:
+To see results line by line, modify the code to print one token per line along with its predicted label.
+
+Modify Code for Line-by-Line Output
+Use this:
+
+python
+Copy
+Edit
+# Pick a sample from test dataset
+sample = test_dataset[0]
+input_ids = sample["input_ids"].unsqueeze(0)
+
+# Get model output
+model.eval()
+with torch.no_grad():
+    output = model(input_ids)
+predictions = torch.argmax(output.logits, dim=2)
+
+# Convert predictions to labels
+tokens = tokenizer.convert_ids_to_tokens(sample["input_ids"])
+predicted_labels = [id2label[p.item()] for p in predictions[0]]
+
+# Print results line by line
+print("\n--- Token Predictions ---")
+for token, pred in zip(tokens, predicted_labels):
+    print(f"Token: {token.ljust(15)}  →  Predicted Label: {pred}")
+✅ Example Output (Line by Line)
+vbnet
+Copy
+Edit
+--- Token Predictions ---
+Token: [CLS]           →  O
+Token: John            →  B-PER
+Token: Smith           →  I-PER
+Token: lives           →  O
+Token: in              →  O
+Token: New             →  B-LOC
+Token: York            →  I-LOC
+Token: .               →  O
+Token: [SEP]           →  O
+🔹 Why This Works?
+Each token is printed separately (no long single-line output)
+Tokens are left-aligned (ljust(15)) for readability
+Predicted labels are clearly shown next to each token
+🛠 Need Custom Formatting?
+Tell me if you want to adjust the display! 🚀
+
+
+
+
+
+
+You said:
+i ma taling about epoch ,loss that output
+ChatGPT said:
+After executing trainer.train(), the output typically includes training progress, such as:
+
+Epoch number
+Training loss
+Evaluation loss (if applicable)
+Time taken per epoch
+Learning rate adjustments
+🔹 Example Output from trainer.train()
+markdown
+Copy
+Edit
+***** Running training *****
+  Num examples = 8000
+  Num Epochs = 3
+  Instantaneous batch size per device = 8
+  Total optimization steps = 3000
+
+Epoch | Training Loss | Eval Loss | Learning Rate | Time
+-----------------------------------------------------------
+1/3   | 0.9234       | 0.8765    | 5e-5          | 00:10
+2/3   | 0.7156       | 0.6891    | 4e-5          | 00:09
+3/3   | 0.5893       | 0.5614    | 3e-5          | 00:09
+
+Training completed successfully!
+🔍 How to Improve Output Formatting?
+If you want to print results more clearly, use logging_steps in TrainingArguments:
+
+python
+Copy
+Edit
+training_args = TrainingArguments(
+    output_dir="./ner_model",
+    evaluation_strategy="epoch",
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    logging_dir="./logs",
+    logging_steps=50,  # Print loss every 50 steps
+)
+📌 How to Extract Final Metrics?
+After training, you can check the final results:
+
+python
+Copy
+Edit
+# Get final metrics
+final_metrics = trainer.state.log_history
+for metric in final_metrics:
+    print(metric)
+This prints loss, epoch, and learning rate for every logging step.
+
+❓ Need Further Customization?
+Do you want a separate file for logs?
+Do you want a graph of loss vs. epochs?
+Let me know what you need! 🚀
+
+
+
+
+
+You said:
+also  i need deatils description of each metrics what loss , epoch what value is considered good
+ChatGPT said:
+📌 Understanding Each Metric in trainer.train() Output
+When training an NER model with BERT, you get several metrics that indicate model performance. Here’s a breakdown of each one:
+
+🔹 1. Epoch
+🔸 Definition: An epoch is one full pass of the training data through the model.
+🔸 Example Output: Epoch 1/3 means this is the first out of three training iterations.
+🔸 Good Value:
+
+Too few epochs → Model underfits (does not learn enough).
+Too many epochs → Model overfits (memorizes data, poor generalization).
+Common range: 3–10 epochs for BERT fine-tuning.
+🔹 2. Training Loss (train_loss)
+🔸 Definition: Measures how well the model is learning during training.
+🔸 Example Output:
+
+yaml
+Copy
+Edit
+Epoch 1 | Training Loss: 0.9234
+Epoch 2 | Training Loss: 0.7156
+Epoch 3 | Training Loss: 0.5893
+🔸 Good Value:
+
+Should decrease over epochs → The model is learning.
+If stuck or increasing → Possible issue with learning rate, batch size, or data.
+For BERT in NER tasks: Training loss should be around 0.5 or lower for a well-trained model.
+🔹 3. Evaluation Loss (eval_loss)
+🔸 Definition: Measures performance on the validation dataset.
+🔸 Example Output:
+
+yaml
+Copy
+Edit
+Epoch 1 | Eval Loss: 0.8765
+Epoch 2 | Eval Loss: 0.6891
+Epoch 3 | Eval Loss: 0.5614
+🔸 Good Value:
+
+Should decrease over epochs (like training loss).
+If eval loss stops decreasing while train loss keeps decreasing, the model may be overfitting.
+A well-trained BERT model for NER should have an eval loss ≤ 0.6.
+🔹 4. Learning Rate (learning_rate)
+🔸 Definition: Controls how much the model updates weights in each step.
+🔸 Example Output:
+
+yaml
+Copy
+Edit
+Epoch 1 | Learning Rate: 5e-5
+Epoch 2 | Learning Rate: 4e-5
+Epoch 3 | Learning Rate: 3e-5
+🔸 Good Value:
+
+Too high (e.g., 5e-4) → Model learns too fast, unstable.
+Too low (e.g., 1e-6) → Model learns too slowly.
+For BERT fine-tuning: 2e-5 to 5e-5 is optimal.
+Learning rate decays over time for stable training.
+🔹 5. Time per Epoch
+🔸 Definition: Measures training duration for one epoch.
+🔸 Example Output:
+
+less
+Copy
+Edit
+Epoch 1 | Time: 00:10
+Epoch 2 | Time: 00:09
+Epoch 3 | Time: 00:09
+🔸 Good Value:
+
+Depends on dataset size and GPU speed.
+For BERT-base on Colab, typical training time is 5–20 min per epoch.
+If too slow, try reducing batch size or sequence length.
+🔹 6. Steps and Logging (logging_steps)
+🔸 Definition: Tracks progress at intervals (e.g., every 50 steps).
+🔸 Example Output (logged during training):
+
+vbnet
+Copy
+Edit
+Step 50 | Loss: 1.10
+Step 100 | Loss: 0.95
+Step 150 | Loss: 0.88
+🔸 Good Value:
+
+Should gradually decrease.
+If jumps too much, batch size or learning rate may need adjustment.
+Set logging_steps=50 for frequent updates.
+🔍 What Metrics Are Considered "Good"?
+Metric	Ideal Value (NER)	Issue If Too High	Issue If Too Low
+Epochs	3–10	Underfitting	Overfitting
+Training Loss	≤ 0.5	Not learning	May be overfitting
+Eval Loss	≤ 0.6	Overfitting	Underfitting
+Learning Rate	2e-5 to 5e-5	Unstable training	Slow learning
+Training Time	5–20 min/epoch	Too slow, optimize	Too fast, may indicate poor learning
+📌 How to Improve Performance?
+Loss too high? Try reducing learning_rate or increasing num_train_epochs.
+Overfitting? Increase eval_dataset size, use dropout, or add regularization.
+Slow training? Reduce batch_size or max_length in tokenizer.
+📊 How to Visualize Performance?
+You can plot training loss over epochs:
+
+python
+Copy
+Edit
+import matplotlib.pyplot as plt
+
+train_losses = [x["loss"] for x in trainer.state.log_history if "loss" in x]
+eval_losses = [x["eval_loss"] for x in trainer.state.log_history if "eval_loss" in x]
+
+plt.plot(train_losses, label="Train Loss")
+plt.plot(eval_losses, label="Eval Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.legend()
+plt.show()
+🔹 This helps track whether your model improves or overfits.
+
+🚀 Next Steps
+Do you need custom metrics like F1-score, precision, recall?
+Do you want to hyper-tune learning rate, batch size?
+Let me know how you’d like to analyze the results further! 🚀
+
+
+
+
+
+You said:
+yes plz
+ChatGPT said:
+📌 Advanced Model Performance Analysis (NER with BERT)
+Now that your model is training successfully, let's evaluate it using standard NLP classification metrics:
+
+Accuracy → Measures overall correctness.
+Precision, Recall, F1-score → Crucial for NER tasks.
+Confusion Matrix → Shows misclassifications.
+Loss Graphs → Helps identify overfitting or underfitting.
+🔹 1. Evaluate Model Performance on Test Data
+Hugging Face Trainer provides trainer.evaluate(), but let's compute metrics manually.
+
+📌 Generate Predictions
+python
+Copy
+Edit
+import numpy as np
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Get model predictions on test data
+predictions, labels, _ = trainer.predict(test_dataset)
+
+# Convert logits to label indices
+predictions = np.argmax(predictions, axis=2)
+
+# Convert indices to actual labels
+true_labels = [[id2label[l] for l in label_seq if l != -100] for label_seq in labels]
+predicted_labels = [[id2label[p] for p, l in zip(pred_seq, label_seq) if l != -100] for pred_seq, label_seq in zip(predictions, labels)]
+🔹 2. Compute Accuracy, Precision, Recall, F1-score
+NER tasks use macro/micro F1-scores since class distribution is imbalanced.
+
+python
+Copy
+Edit
+from sklearn.metrics import precision_recall_fscore_support
+
+# Flatten label lists
+flat_true_labels = [item for sublist in true_labels for item in sublist]
+flat_predicted_labels = [item for sublist in predicted_labels for item in sublist]
+
+# Compute precision, recall, F1-score
+precision, recall, f1, _ = precision_recall_fscore_support(flat_true_labels, flat_predicted_labels, average="weighted")
+
+print(f"Precision: {precision:.4f}")
+print(f"Recall: {recall:.4f}")
+print(f"F1-score: {f1:.4f}")
+📌 Interpretation:
+
+F1-score > 85% → Good model
+F1-score < 50% → Model needs improvement (try better hyperparameters)
+🔹 3. Detailed Classification Report
+To check performance per NER tag (B-PER, I-LOC, etc.), use:
+
+python
+Copy
+Edit
+print(classification_report(flat_true_labels, flat_predicted_labels))
+🔹 Example Output:
+
+css
+Copy
+Edit
+              precision    recall  f1-score   support
+B-LOC           0.89       0.92      0.90       500
+I-LOC           0.85       0.87      0.86       200
+B-PER           0.92       0.95      0.93       400
+I-PER           0.88       0.89      0.88       250
+O               0.98       0.99      0.98       7000
+📌 Key Insights:
+
+Low recall? Model is missing entities.
+Low precision? Model is over-identifying entities.
+🔹 4. Confusion Matrix
+To analyze misclassifications:
+
+python
+Copy
+Edit
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+labels_list = list(set(flat_true_labels))  # Unique labels
+cm = confusion_matrix(flat_true_labels, flat_predicted_labels, labels=labels_list)
+
+plt.figure(figsize=(10,8))
+sns.heatmap(cm, annot=True, fmt="d", xticklabels=labels_list, yticklabels=labels_list, cmap="Blues")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.title("NER Confusion Matrix")
+plt.show()
+🔹 Helps identify common misclassifications (e.g., B-LOC predicted as O).
+
+🔹 5. Visualizing Training vs Validation Loss
+To ensure training stability:
+
+python
+Copy
+Edit
+import matplotlib.pyplot as plt
+
+train_losses = [x["loss"] for x in trainer.state.log_history if "loss" in x]
+eval_losses = [x["eval_loss"] for x in trainer.state.log_history if "eval_loss" in x]
+
+plt.plot(train_losses, label="Train Loss")
+plt.plot(eval_losses, label="Eval Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.legend()
+plt.title("Loss Curve")
+plt.show()
+🔹 Good Curve: Loss decreases smoothly
+🔹 Bad Curve:
+
+If train loss drops, eval loss increases → Overfitting
+If train loss doesn’t decrease → Learning rate too high/low
+🔹 6. Hyperparameter Tuning
+You can adjust hyperparameters using Trainer settings:
+
+python
+Copy
+Edit
+training_args = TrainingArguments(
+    per_device_train_batch_size=16,   # Adjust batch size
+    per_device_eval_batch_size=16,
+    learning_rate=3e-5,               # Try 2e-5, 5e-5
+    num_train_epochs=5,               # Increase if underfitting
+    weight_decay=0.01,                # Regularization
+    evaluation_strategy="epoch"       # Evaluate after each epoch
+)
+📌 Which Hyperparameter to Tune?
+
+Issue	Solution
+Overfitting	Increase weight decay, add dropout
+Slow Learning	Increase learning rate
+Unstable Training	Reduce learning rate
+Low Recall	Increase training epochs
+🚀 Next Steps
+Would you like to:
+
+Fine-tune hyperparameters automatically with Optuna?
+Save and deploy the model for inference?
+Perform entity-level error analysis?
+Let me know how you want to proceed! 🚀
+
+
+
+
+
+
+You said:
+i want to final csv in which pridicted and actual tag there for both training and testing seprately
+ChatGPT said:
+To generate final CSVs containing actual vs. predicted NER tags for both training and test datasets, follow these steps:
+
+📌 1. Extract Predictions for Training and Testing Data
+We'll first get predictions and convert them into labels.
+
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+
+# Function to get predictions and format results
+def get_predictions(dataset, dataset_name):
+    predictions, labels, _ = trainer.predict(dataset)
+
+    # Convert logits to label indices
+    predictions = np.argmax(predictions, axis=2)
+
+    # Convert indices to actual labels
+    true_labels = [[id2label[l] for l in label_seq if l != -100] for label_seq in labels]
+    predicted_labels = [[id2label[p] for p, l in zip(pred_seq, label_seq) if l != -100] for pred_seq, label_seq in zip(predictions, labels)]
+
+    # Flatten lists
+    flat_tokens = [tokenizer.convert_ids_to_tokens(sample["input_ids"]) for sample in dataset]
+    flat_true_labels = [item for sublist in true_labels for item in sublist]
+    flat_pred_labels = [item for sublist in predicted_labels for item in sublist]
+
+    # Create DataFrame
+    df = pd.DataFrame({"Token": flat_tokens, "Actual_Label": flat_true_labels, "Predicted_Label": flat_pred_labels})
+    df.to_csv(f"{dataset_name}_NER_predictions.csv", index=False)
+
+    print(f"✅ {dataset_name}_NER_predictions.csv saved successfully!")
+
+# Save predictions for both datasets
+get_predictions(train_dataset, "Train")
+get_predictions(test_dataset, "Test")
+📌 2. Expected CSV Output Format
+Train_NER_predictions.csv
+Token	Actual_Label	Predicted_Label
+The	O	O
+system	B-FAILURE	B-FAILURE
+failed	I-FAILURE	I-FAILURE
+due	O	O
+to	O	O
+Test_NER_predictions.csv
+Token	Actual_Label	Predicted_Label
+Network	B-ISSUE	B-ISSUE
+error	I-ISSUE	I-ISSUE
+occurred	O	O
+📌 3. Next Steps
+Would you like:
+
+Performance analysis on misclassifications?
+Visualization of incorrect predictions?
+Hyperparameter tuning for better results?
+Let me know how you’d like to proceed! 🚀
+
+
+
+
+
+
+You said:
+yes
+ChatGPT said:
+Let's analyze the model performance on misclassifications and visualize incorrect predictions. 🚀
+
+📌 1. Analyze Misclassifications
+We’ll calculate:
+
+Overall accuracy
+Precision, Recall, and F1-score per entity class
+Examples of incorrect predictions
+🛠️ Compute Performance Metrics
+python
+Copy
+Edit
+from sklearn.metrics import classification_report
+
+def evaluate_model(dataset, dataset_name):
+    predictions, labels, _ = trainer.predict(dataset)
+
+    # Convert logits to label indices
+    predictions = np.argmax(predictions, axis=2)
+
+    # Convert indices to actual labels
+    true_labels = [[id2label[l] for l in label_seq if l != -100] for label_seq in labels]
+    predicted_labels = [[id2label[p] for p, l in zip(pred_seq, label_seq) if l != -100] for pred_seq, label_seq in zip(predictions, labels)]
+
+    # Flatten lists
+    flat_true_labels = [item for sublist in true_labels for item in sublist]
+    flat_pred_labels = [item for sublist in predicted_labels for item in sublist]
+
+    # Compute classification report
+    report = classification_report(flat_true_labels, flat_pred_labels, digits=4)
+    print(f"📊 Performance Report for {dataset_name}:\n", report)
+
+# Evaluate for both Train and Test datasets
+evaluate_model(train_dataset, "Train")
+evaluate_model(test_dataset, "Test")
+📌 2. Identify Misclassified Tokens
+python
+Copy
+Edit
+def get_misclassified_tokens(dataset, dataset_name):
+    predictions, labels, _ = trainer.predict(dataset)
+    predictions = np.argmax(predictions, axis=2)
+
+    # Convert indices to actual labels
+    true_labels = [[id2label[l] for l in label_seq if l != -100] for label_seq in labels]
+    predicted_labels = [[id2label[p] for p, l in zip(pred_seq, label_seq) if l != -100] for pred_seq, label_seq in zip(predictions, labels)]
+    
+    # Flatten lists
+    flat_tokens = [tokenizer.convert_ids_to_tokens(sample["input_ids"]) for sample in dataset]
+    flat_true_labels = [item for sublist in true_labels for item in sublist]
+    flat_pred_labels = [item for sublist in predicted_labels for item in sublist]
+
+    # Identify misclassified tokens
+    misclassified = [
+        (token, true, pred)
+        for token, true, pred in zip(flat_tokens, flat_true_labels, flat_pred_labels)
+        if true != pred
+    ]
+
+    df_misclassified = pd.DataFrame(misclassified, columns=["Token", "Actual_Label", "Predicted_Label"])
+    df_misclassified.to_csv(f"{dataset_name}_misclassified.csv", index=False)
+    print(f"❌ Misclassified Tokens saved in {dataset_name}_misclassified.csv")
+
+# Identify misclassifications in both datasets
+get_misclassified_tokens(train_dataset, "Train")
+get_misclassified_tokens(test_dataset, "Test")
+📌 3. Hyperparameter Tuning for Better Results
+Try adjusting these parameters to improve performance:
+
+🔹 Training Arguments
+python
+Copy
+Edit
+training_args = TrainingArguments(
+    output_dir="./ner_model",
+    evaluation_strategy="epoch",
+    per_device_train_batch_size=16,  # Increase batch size if possible
+    per_device_eval_batch_size=16,
+    num_train_epochs=5,  # Increase epochs if underfitting
+    weight_decay=0.01,
+    learning_rate=3e-5,  # Experiment with 2e-5 or 5e-5
+    warmup_steps=500,
+    logging_dir="./logs",
+    save_total_limit=2,
+)
+Try experimenting with:
+
+More epochs (3 → 5)
+Higher batch size (8 → 16)
+Lower learning rate (5e-5 → 3e-5)
+📌 4. Visualize Incorrect Predictions (Optional)
+Would you like a heatmap of errors, a confusion matrix, or something else? Let me know! 🚀
