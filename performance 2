@@ -1,4 +1,203 @@
-🔍 Issue: KeyError: np.int64 in Training Data Processing
+Actually i wma looking for comparison with dataset train and dataset test the want to understand shape
+
+ChatGPT said:
+To compare the training and test datasets in terms of shape, entity distribution, and performance, let's analyze:
+
+1️⃣ Dataset Shape Comparison
+Dataset	Total Samples	Total Words	Unique Entities
+Train Set	X_train.shape[0]	len(tokenizer(X_train))	len(set(y_train))
+Test Set	X_test.shape[0]	len(tokenizer(X_test))	len(set(y_test))
+📌 Key Insights:
+
+If the test set is significantly smaller than the train set, results may not generalize well.
+If the entity distribution is very different in train vs. test, the model might struggle with unseen patterns.
+2️⃣ Entity Distribution in Train vs. Test
+To compare how well the dataset is balanced across entity types:
+
+Train Entity Count
+python
+Copy
+Edit
+from collections import Counter
+train_entity_counts = Counter([label for sublist in y_train for label in sublist])
+print("Training Entity Distribution:", train_entity_counts)
+Test Entity Count
+python
+Copy
+Edit
+test_entity_counts = Counter([label for sublist in y_test for label in sublist])
+print("Test Entity Distribution:", test_entity_counts)
+📌 Key Insights:
+
+If a certain entity (e.g., B-ORG) appears frequently in train but rarely in test, the model may perform poorly on that entity.
+A well-balanced dataset ensures consistent performance across all entity types.
+3️⃣ Performance Comparison on Train vs. Test
+After training the model, let's compare how well it performs on training vs. test data.
+
+Train Performance
+python
+Copy
+Edit
+print(classification_report(y_train_actual, y_train_pred, digits=3))
+Test Performance
+python
+Copy
+Edit
+print(classification_report(y_test_actual, y_test_pred, digits=3))
+📌 Key Insights:
+
+High train accuracy but low test accuracy? → Model is overfitting (memorizing the train data instead of generalizing).
+Similar performance on train & test? → Model is generalizing well.
+4️⃣ Summary Table (Train vs. Test Performance)
+Dataset	Accuracy	Precision	Recall	F1-Score
+Train Set	train_accuracy	train_precision	train_recall	train_f1
+Test Set	test_accuracy	test_precision	test_recall	test_f1
+📌 What This Means for the Client:
+
+If train/test scores are similar, the model generalizes well.
+If train scores are much higher than test, it means the model is overfitting.
+If certain entities perform better in train but worse in test, we may need more diverse data or augmentation.
+Let me know if you need code snippets for storing actual vs. predicted results in a CSV file for both datasets! 🚀
+
+
+
+
+
+
+You said:
+Train dataset and test data set lenth , i want to see the data inside
+ChatGPT said:
+To check the length and preview the train and test datasets, use the following steps:
+
+1️⃣ Train & Test Dataset Length
+python
+Copy
+Edit
+print("Length of Training Dataset:", len(X_train))
+print("Length of Testing Dataset:", len(X_test))
+2️⃣ Preview the Data
+Train Data (First 5 Examples)
+python
+Copy
+Edit
+for i in range(5):
+    print(f"Sentence {i+1}: {' '.join(X_train[i])}")
+    print(f"Labels: {y_train[i]}")
+    print("="*80)
+Test Data (First 5 Examples)
+python
+Copy
+Edit
+for i in range(5):
+    print(f"Sentence {i+1}: {' '.join(X_test[i])}")
+    print(f"Labels: {y_test[i]}")
+    print("="*80)
+3️⃣ Convert Train/Test Data to Pandas DataFrame for Better View
+python
+Copy
+Edit
+import pandas as pd
+
+train_df = pd.DataFrame({"Sentence": [" ".join(sent) for sent in X_train], "Labels": [" ".join(labels) for labels in y_train]})
+test_df = pd.DataFrame({"Sentence": [" ".join(sent) for sent in X_test], "Labels": [" ".join(labels) for labels in y_test]})
+
+# Show first 5 rows
+print("Training Data Sample:")
+print(train_df.head())
+
+print("\nTesting Data Sample:")
+print(test_df.head())
+4️⃣ Save Train & Test Data to CSV for Further Analysis
+python
+Copy
+Edit
+train_df.to_csv("train_data_preview.csv", index=False)
+test_df.to_csv("test_data_preview.csv", index=False)
+📌 What This Will Show You:
+
+The number of sentences in the train and test datasets.
+A sample of the sentences with their corresponding labels.
+CSV files containing the dataset for detailed inspection.
+Let me know if you need additional formatting! 🚀
+
+
+
+
+
+
+You said:
+i want comaprion on this actual vs pred tag on this file
+ChatGPT said:
+To compare actual vs predicted tags for both training and testing datasets, follow these steps:
+
+1️⃣ Convert Predictions to Readable Format
+First, ensure that the predicted labels are in the same format as the actual labels.
+
+python
+Copy
+Edit
+true_labels = [[id2label[l] for l in label_seq if l != -100] for label_seq in labels]
+predicted_labels = [[id2label[p] for p, l in zip(pred_seq, label_seq) if l != -100] for pred_seq, label_seq in zip(predictions, labels)]
+2️⃣ Create a DataFrame for Easy Comparison
+Now, we will store the actual and predicted labels in a structured format.
+
+python
+Copy
+Edit
+import pandas as pd
+
+# Create a DataFrame for Train
+train_comparison_df = pd.DataFrame({
+    "Sentence": [" ".join(sent) for sent in X_train],
+    "Actual Tags": [" ".join(label) for label in true_labels_train],
+    "Predicted Tags": [" ".join(pred) for pred in predicted_labels_train]
+})
+
+# Create a DataFrame for Test
+test_comparison_df = pd.DataFrame({
+    "Sentence": [" ".join(sent) for sent in X_test],
+    "Actual Tags": [" ".join(label) for label in true_labels_test],
+    "Predicted Tags": [" ".join(pred) for pred in predicted_labels_test]
+})
+
+# Show Sample
+print("Train Data Sample:")
+print(train_comparison_df.head())
+
+print("\nTest Data Sample:")
+print(test_comparison_df.head())
+3️⃣ Save to CSV for Analysis
+To analyze the results in Excel or Pandas:
+
+python
+Copy
+Edit
+train_comparison_df.to_csv("train_actual_vs_predicted.csv", index=False)
+test_comparison_df.to_csv("test_actual_vs_predicted.csv", index=False)
+4️⃣ Metrics for Performance Analysis
+Now, evaluate the accuracy of predictions:
+
+python
+Copy
+Edit
+from sklearn.metrics import classification_report
+
+print("Train Data Performance:")
+print(classification_report([label for seq in true_labels_train for label in seq], 
+                            [label for seq in predicted_labels_train for label in seq]))
+
+print("\nTest Data Performance:")
+print(classification_report([label for seq in true_labels_test for label in seq], 
+                            [label for seq in predicted_labels_test for label in seq]))
+📌 What This Will Show You:
+
+A side-by-side comparison of actual vs predicted labels.
+Train and test CSV files with predictions.
+A classification report with precision, recall, and F1-score for each entity type.
+🔍 Let me know if you need further refinements! 🚀
+
+######################
+#############🔍 Issue: KeyError: np.int64 in Training Data Processing
 The error occurs because some labels in labels or predictions are numpy.int64 instead of regular Python integers. This happens when working with NumPy arrays, which default to NumPy's integer types.
 
 ✅ Fix: Convert Labels to Python Integers Before Lookup
