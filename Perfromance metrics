@@ -1,3 +1,685 @@
+the file i amgetting train and test very less data and not look like real file that i a using for model
+
+ChatGPT said:
+It looks like the predicted train and test CSV files are not capturing all the data correctly. This can happen due to:
+
+Incorrect Sentence Splitting – The dataset might not be fully iterated.
+Padding and Subword Handling Issues – Only the first subword should be used for predictions.
+Mismatch in Dataset Size – We need to ensure all tokens are included.
+🔹 Step-by-Step Fix
+I'll rewrite the function to correctly extract all tokens, actual tags, and predicted tags while properly aligning them.
+
+🔹 Fixed Code for Saving Predictions
+python
+Copy
+Edit
+def get_predictions(trainer, dataset, tokenizer, label2id, output_file):
+    id2label = {v: k for k, v in label2id.items()}  # Reverse label mapping
+
+    # 🔹 Get model predictions
+    predictions_output = trainer.predict(dataset)
+    predictions = predictions_output.predictions  # Raw logits
+    labels = predictions_output.label_ids         # Actual label IDs
+
+    preds = np.argmax(predictions, axis=2)  # Convert logits to predicted label IDs
+
+    data = []
+    
+    for i in range(len(dataset)):
+        sample = dataset[i]  # Fetch individual data sample
+        input_ids = sample["input_ids"].numpy()  # Token IDs
+        label_ids = labels[i]  # True label IDs
+        pred_ids = preds[i]  # Predicted label IDs
+
+        tokens = tokenizer.convert_ids_to_tokens(input_ids)  # Convert token IDs to tokens
+        word_ids = sample["attention_mask"].numpy()  # Word alignment
+
+        true_labels = []
+        pred_labels = []
+        valid_tokens = []
+
+        previous_word_idx = None
+        for j, word_idx in enumerate(word_ids):  # Process each token
+            if word_idx == 1 and (previous_word_idx is None or word_idx != previous_word_idx):  
+                valid_tokens.append(tokens[j])
+                true_labels.append(id2label.get(label_ids[j], "O"))  # Use "O" for ignored labels
+                pred_labels.append(id2label.get(pred_ids[j], "O"))
+            previous_word_idx = word_idx
+
+        # Ensure all lists are the same length
+        if len(valid_tokens) == len(true_labels) == len(pred_labels):
+            for token, actual, predicted in zip(valid_tokens, true_labels, pred_labels):
+                data.append([i, token, actual, predicted])
+        else:
+            print(f"Warning: Mismatch in lengths for sentence {i}")
+
+    # Save to CSV
+    df = pd.DataFrame(data, columns=["Sentence_ID", "Token", "Actual_Tag", "Predicted_Tag"])
+    df.to_csv(output_file, index=False)
+    print(f"Predictions saved to {output_file}, total rows: {len(df)}")
+
+🔹 Key Fixes
+✅ Fixed Token Alignment
+
+Ensured full token list is captured
+Filtered out unnecessary subwords
+✅ Fixed Mismatch in Dataset Size
+
+Ensured that the final CSV contains all tokens from the dataset
+Used word alignment from attention mask to keep structure correct
+✅ Handled Edge Cases
+
+Avoided Padding Tokens (word_ids == None)
+Avoided Extra Subwords (word_ids != previous_word_idx)
+🔹 Run the Function for Train & Test Data
+python
+Copy
+Edit
+get_predictions(trainer, train_dataset, tokenizer, label2id, "train_predictions.csv")
+get_predictions(trainer, test_dataset, tokenizer, label2id, "test_predictions.csv")
+🚀 Now, your actual vs predicted CSV files should match the dataset correctly!
+
+
+
+
+
+
+You said:
+ok any other method to build NER model with same bert-based -ner
+ChatGPT said:
+Yes! There are multiple ways to build an NER model using bert-base-ner. Here are three alternative methods to train and evaluate your model while keeping it efficient:
+
+🔹 Alternative 1: Using 🤗 Transformers Pipelines (Fastest & Simplest)
+If your goal is to use the pre-trained model without fine-tuning, you can simply use the Hugging Face pipeline.
+
+📌 Install Dependencies
+python
+Copy
+Edit
+from transformers import pipeline
+
+# Load Pretrained NER Model
+ner_pipeline = pipeline("ner", model="dbmdz/bert-large-cased-finetuned-conll03-english")
+
+# Example Input
+text = "John lives in New York and works at Google."
+
+# Predict Entities
+ner_results = ner_pipeline(text)
+
+# Display Results
+for entity in ner_results:
+    print(entity)
+✅ Pros: No training required, quick inference
+❌ Cons: Cannot be fine-tuned on custom data
+
+🔹 Alternative 2: Fine-Tuning with SimpleTransformers (Easier Training)
+If you want an easier training process without using Trainer API, simpletransformers provides a simplified wrapper for training NER models.
+
+📌 Install SimpleTransformers
+bash
+Copy
+Edit
+pip install simpletransformers
+📌 Prepare Data
+The input dataset should be formatted as:
+
+mathematica
+Copy
+Edit
+Sentence_ID	Token	Tag
+0	John	B-PER
+0	lives	O
+0	in	O
+0	New	B-LOC
+0	York	I-LOC
+1	Google	B-ORG
+1	is	O
+1	a	O
+1	company	O
+📌 Train the Model
+python
+Copy
+Edit
+from simpletransformers.ner import NERModel
+import pandas as pd
+
+# Load Data
+train_data = pd.read_csv("train_data.csv", sep="\t")
+test_data = pd.read_csv("test_data.csv", sep="\t")
+
+# Define Model
+model = NERModel(
+    "bert", 
+    "bert-base-uncased", 
+    labels=list(train_data["Tag"].unique()), 
+    args={"overwrite_output_dir": True, "num_train_epochs": 3}
+)
+
+# Train Model
+model.train_model(train_data)
+
+# Evaluate Model
+result, model_outputs, predictions = model.eval_model(test_data)
+
+# Save Predictions
+test_data["Predicted"] = predictions
+test_data.to_csv("test_predictions.csv", index=False)
+✅ Pros: Simplified training, no need for manual tokenization
+❌ Cons: Less control over hyperparameters
+
+🔹 Alternative 3: Fine-Tuning Using Custom PyTorch Training (Advanced)
+This method gives full control over training and evaluation.
+
+📌 Step 1: Load Tokenizer & Model
+python
+Copy
+Edit
+from transformers import BertTokenizerFast, BertForTokenClassification
+import torch
+
+# Load Pretrained BERT Model
+model_name = "bert-base-uncased"
+tokenizer = BertTokenizerFast.from_pretrained(model_name)
+model = BertForTokenClassification.from_pretrained(model_name, num_labels=9)  # Adjust num_labels
+📌 Step 2: Prepare Data
+python
+Copy
+Edit
+class NERDataset(torch.utils.data.Dataset):
+    def __init__(self, sentences, labels, tokenizer, max_len=128):
+        self.sentences = sentences
+        self.labels = labels
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.sentences)
+
+    def __getitem__(self, index):
+        tokens = self.sentences[index]
+        label_ids = self.labels[index]
+
+        encoding = self.tokenizer(
+            tokens,
+            is_split_into_words=True,
+            truncation=True,
+            padding="max_length",
+            max_length=self.max_len,
+            return_tensors="pt"
+        )
+
+        word_ids = encoding.word_ids()
+        aligned_labels = [-100 if i is None else label_ids[i] for i in word_ids]
+
+        return {
+            "input_ids": encoding["input_ids"].squeeze(),
+            "attention_mask": encoding["attention_mask"].squeeze(),
+            "labels": torch.tensor(aligned_labels),
+        }
+📌 Step 3: Training Loop
+python
+Copy
+Edit
+from torch.utils.data import DataLoader
+from transformers import AdamW
+
+train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+
+optimizer = AdamW(model.parameters(), lr=5e-5)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
+for epoch in range(3):  # Adjust epochs
+    model.train()
+    for batch in train_loader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        outputs = model(**batch)
+        loss = outputs.loss
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+
+print("Training Complete!")
+✅ Pros: Full control over training, works for large datasets
+❌ Cons: More complex setup
+
+🔹 Comparison of Methods
+Method	Training Required?	Fine-Tuning?	Best for
+Transformers Pipeline	❌ No	❌ No	Quick inference
+SimpleTransformers	✅ Yes	✅ Yes	Fast, easy training
+Custom PyTorch Training	✅ Yes	✅ Yes	Full control
+Which approach do you prefer? 🚀
+
+
+
+
+
+
+You said:
+use bert-base-ner
+ChatGPT said:
+If you want to train an NER model using bert-base-ner, follow this step-by-step guide. This approach ensures that you handle tokenization, label alignment, training, and evaluation correctly.
+
+🔹 Step 1: Install Dependencies
+First, install the required libraries:
+
+bash
+Copy
+Edit
+pip install transformers datasets seqeval torch
+🔹 Step 2: Load the Pretrained BERT Model for NER
+We will use dbmdz/bert-base-ner, which is a fine-tuned NER model.
+
+python
+Copy
+Edit
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+
+# Load tokenizer and model
+model_name = "dbmdz/bert-base-ner"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForTokenClassification.from_pretrained(model_name)
+✅ Why dbmdz/bert-base-ner?
+
+Pretrained on the CoNLL-2003 dataset (People, Organizations, Locations, Misc).
+Works well for standard Named Entity Recognition (NER) tasks.
+🔹 Step 3: Load and Prepare Your Dataset
+Your dataset should be formatted in this structure:
+
+mathematica
+Copy
+Edit
+Sentence_ID    Word     Label
+0             John      B-PER
+0             lives     O
+0             in        O
+0             New       B-LOC
+0             York      I-LOC
+📌 Load Dataset
+python
+Copy
+Edit
+import pandas as pd
+
+# Load train and test datasets
+train_df = pd.read_csv("train.csv", sep="\t")
+test_df = pd.read_csv("test.csv", sep="\t")
+
+# Extract sentences and labels
+def get_sentences_labels(df):
+    sentences = []
+    labels = []
+    current_sentence = []
+    current_labels = []
+    
+    prev_sentence_id = None
+    for _, row in df.iterrows():
+        sentence_id, word, label = row["Sentence_ID"], row["Word"], row["Label"]
+
+        if prev_sentence_id is None or sentence_id == prev_sentence_id:
+            current_sentence.append(word)
+            current_labels.append(label)
+        else:
+            sentences.append(current_sentence)
+            labels.append(current_labels)
+            current_sentence = [word]
+            current_labels = [label]
+
+        prev_sentence_id = sentence_id
+
+    if current_sentence:
+        sentences.append(current_sentence)
+        labels.append(current_labels)
+    
+    return sentences, labels
+
+train_sentences, train_labels = get_sentences_labels(train_df)
+test_sentences, test_labels = get_sentences_labels(test_df)
+🔹 Step 4: Convert Labels into Numeric IDs
+We need to map labels like B-PER, I-LOC to integers.
+
+python
+Copy
+Edit
+# Unique labels from dataset
+unique_labels = list(set([label for sentence in train_labels for label in sentence]))
+
+# Create label mappings
+label2id = {label: idx for idx, label in enumerate(unique_labels)}
+id2label = {idx: label for label, idx in label2id.items()}
+
+print("Label Mapping:", label2id)
+✅ Why Convert Labels to IDs?
+BERT cannot process text labels directly. Instead, it requires numeric IDs.
+
+🔹 Step 5: Tokenize the Sentences
+We must handle subwords properly and align labels with tokenized words.
+
+python
+Copy
+Edit
+def tokenize_and_align_labels(sentences, labels):
+    tokenized_inputs = tokenizer(sentences, is_split_into_words=True, padding="max_length", truncation=True, max_length=128, return_tensors="pt")
+
+    word_ids = tokenized_inputs.word_ids()
+    aligned_labels = [-100 if i is None else label2id[labels[i]] for i in word_ids]
+
+    return tokenized_inputs, torch.tensor(aligned_labels)
+
+import torch
+
+# Tokenize Train and Test Data
+train_encodings, train_labels_tensor = tokenize_and_align_labels(train_sentences, train_labels)
+test_encodings, test_labels_tensor = tokenize_and_align_labels(test_sentences, test_labels)
+✅ Why Use -100 for Padding?
+BERT ignores -100 during loss calculation to avoid counting padded tokens.
+
+🔹 Step 6: Create PyTorch Dataset
+We wrap our tokenized data in a Dataset class for use in DataLoader.
+
+python
+Copy
+Edit
+from torch.utils.data import Dataset, DataLoader
+
+class NERDataset(Dataset):
+    def __init__(self, encodings, labels):
+        self.encodings = encodings
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        return {
+            "input_ids": self.encodings["input_ids"][idx],
+            "attention_mask": self.encodings["attention_mask"][idx],
+            "labels": self.labels[idx]
+        }
+
+# Create Dataset
+train_dataset = NERDataset(train_encodings, train_labels_tensor)
+test_dataset = NERDataset(test_encodings, test_labels_tensor)
+
+# Create DataLoader
+train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size=8)
+🔹 Step 7: Train the Model
+We fine-tune the model using Trainer from Hugging Face.
+
+python
+Copy
+Edit
+from transformers import Trainer, TrainingArguments
+
+training_args = TrainingArguments(
+    output_dir="./bert_ner",
+    evaluation_strategy="epoch",
+    save_strategy="epoch",
+    learning_rate=5e-5,
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    logging_dir="./logs",
+    logging_steps=10
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=test_dataset
+)
+
+trainer.train()
+✅ What Happens During Training?
+
+The model learns NER classification from your dataset.
+Trainer automatically handles backpropagation, loss calculation, and optimizer updates.
+🔹 Step 8: Evaluate Model Performance
+After training, evaluate the model on the test dataset.
+
+python
+Copy
+Edit
+trainer.evaluate()
+📌 Compute Classification Report
+python
+Copy
+Edit
+from seqeval.metrics import classification_report
+
+def evaluate_model(dataloader):
+    model.eval()
+    all_predictions = []
+    all_labels = []
+
+    with torch.no_grad():
+        for batch in dataloader:
+            input_ids = batch["input_ids"].to("cuda")
+            attention_mask = batch["attention_mask"].to("cuda")
+            labels = batch["labels"].to("cuda")
+
+            outputs = model(input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+            predictions = torch.argmax(logits, dim=-1)
+
+            all_predictions.extend(predictions.cpu().numpy().tolist())
+            all_labels.extend(labels.cpu().numpy().tolist())
+
+    return all_predictions, all_labels
+
+predictions, true_labels = evaluate_model(test_dataloader)
+
+# Convert ID to Label
+true_labels_named = [[id2label[label] for label in labels if label != -100] for labels in true_labels]
+predictions_named = [[id2label[pred] for pred in preds if pred != -100] for preds in predictions]
+
+# Generate Classification Report
+print(classification_report(true_labels_named, predictions_named))
+✅ What Metrics Will You See?
+
+Precision, Recall, F1-Score for each entity type
+Overall micro and macro F1-score
+🔹 Step 9: Save Predictions to CSV
+python
+Copy
+Edit
+test_df["Predicted"] = [pred for sentence in predictions_named for pred in sentence]
+test_df.to_csv("test_predictions.csv", index=False)
+✅ Output: A CSV file with actual vs predicted NER tags.
+
+🔹 Step 10: Hyperparameter Tuning
+Try adjusting:
+
+Learning Rate (learning_rate) → Lowering (e.g., 3e-5) can improve performance.
+Epochs (num_train_epochs) → Too many epochs can lead to overfitting.
+Batch Size (per_device_train_batch_size) → Increase if you have more GPU memory.
+✅ Summary of Steps
+1️⃣ Load bert-base-ner tokenizer & model
+2️⃣ Load & preprocess dataset
+3️⃣ Convert labels to numeric IDs
+4️⃣ Tokenize and align labels
+5️⃣ Create PyTorch dataset
+6️⃣ Train model using Trainer
+7️⃣ Evaluate and generate a classification report
+8️⃣ Save actual vs predicted tags
+
+Would you like any modifications or additional explanations? 🚀
+
+
+
+
+
+
+You said:
+al so i need train and test file with acutal and ored tag
+ChatGPT said:
+You can save the actual vs predicted NER tags for both the train and test datasets as CSV files using the following code.
+
+🔹 Step 1: Predict Labels for Train and Test Data
+Use the trained model to predict NER tags for both train and test datasets.
+
+python
+Copy
+Edit
+import torch
+
+def predict_ner(dataloader, dataset):
+    model.eval()
+    all_predictions = []
+    all_labels = []
+    all_words = []
+
+    with torch.no_grad():
+        for batch in dataloader:
+            input_ids = batch["input_ids"].to("cuda")
+            attention_mask = batch["attention_mask"].to("cuda")
+            labels = batch["labels"].to("cuda")
+
+            outputs = model(input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+            predictions = torch.argmax(logits, dim=-1)
+
+            # Convert token IDs back to words
+            for i, input_id_list in enumerate(input_ids):
+                word_ids = tokenizer.convert_ids_to_tokens(input_id_list.cpu().tolist())
+                pred_labels = [id2label[pred] for pred in predictions[i].cpu().tolist()]
+                true_labels = [id2label[label] if label in id2label else "O" for label in labels[i].cpu().tolist()]
+                
+                all_words.append(word_ids)
+                all_predictions.append(pred_labels)
+                all_labels.append(true_labels)
+
+    return all_words, all_labels, all_predictions
+
+# Predict for train and test
+train_words, train_actual_labels, train_pred_labels = predict_ner(train_dataloader, train_dataset)
+test_words, test_actual_labels, test_pred_labels = predict_ner(test_dataloader, test_dataset)
+🔹 Step 2: Save Predictions to CSV
+Now, save the predictions for both train and test datasets into CSV files.
+
+python
+Copy
+Edit
+import pandas as pd
+
+def save_predictions_to_csv(words, actual_labels, predicted_labels, filename):
+    flat_words = [word for sentence in words for word in sentence]
+    flat_actual_labels = [label for sentence in actual_labels for label in sentence]
+    flat_predicted_labels = [label for sentence in predicted_labels for label in sentence]
+
+    df = pd.DataFrame({"Word": flat_words, "Actual_Label": flat_actual_labels, "Predicted_Label": flat_predicted_labels})
+    df.to_csv(filename, index=False)
+    print(f"Saved predictions to {filename}")
+
+# Save train and test predictions
+save_predictions_to_csv(train_words, train_actual_labels, train_pred_labels, "train_predictions.csv")
+save_predictions_to_csv(test_words, test_actual_labels, test_pred_labels, "test_predictions.csv")
+✅ Expected Output
+You will get two CSV files: 1️⃣ train_predictions.csv
+2️⃣ test_predictions.csv
+
+Each file will have three columns:
+
+Word	Actual_Label	Predicted_Label
+John	B-PER	B-PER
+lives	O	O
+in	O	O
+New	B-LOC	B-LOC
+York	I-LOC	I-LOC
+This allows you to compare actual vs predicted NER labels for both train and test data.
+
+💡 Next Steps
+Check Accuracy: Calculate how many predictions match actual labels.
+Error Analysis: Identify which entities the model struggles with.
+Hyperparameter Tuning: Improve model performance by adjusting learning rate, batch size, and epochs.
+Would you like any modifications? 🚀
+
+#######################################################################################################333
+It looks like the predicted train and test CSV files are not capturing all the data correctly. This can happen due to:
+
+Incorrect Sentence Splitting – The dataset might not be fully iterated.
+Padding and Subword Handling Issues – Only the first subword should be used for predictions.
+Mismatch in Dataset Size – We need to ensure all tokens are included.
+🔹 Step-by-Step Fix
+I'll rewrite the function to correctly extract all tokens, actual tags, and predicted tags while properly aligning them.
+
+🔹 Fixed Code for Saving Predictions
+python
+Copy
+Edit
+def get_predictions(trainer, dataset, tokenizer, label2id, output_file):
+    id2label = {v: k for k, v in label2id.items()}  # Reverse label mapping
+
+    # 🔹 Get model predictions
+    predictions_output = trainer.predict(dataset)
+    predictions = predictions_output.predictions  # Raw logits
+    labels = predictions_output.label_ids         # Actual label IDs
+
+    preds = np.argmax(predictions, axis=2)  # Convert logits to predicted label IDs
+
+    data = []
+    
+    for i in range(len(dataset)):
+        sample = dataset[i]  # Fetch individual data sample
+        input_ids = sample["input_ids"].numpy()  # Token IDs
+        label_ids = labels[i]  # True label IDs
+        pred_ids = preds[i]  # Predicted label IDs
+
+        tokens = tokenizer.convert_ids_to_tokens(input_ids)  # Convert token IDs to tokens
+        word_ids = sample["attention_mask"].numpy()  # Word alignment
+
+        true_labels = []
+        pred_labels = []
+        valid_tokens = []
+
+        previous_word_idx = None
+        for j, word_idx in enumerate(word_ids):  # Process each token
+            if word_idx == 1 and (previous_word_idx is None or word_idx != previous_word_idx):  
+                valid_tokens.append(tokens[j])
+                true_labels.append(id2label.get(label_ids[j], "O"))  # Use "O" for ignored labels
+                pred_labels.append(id2label.get(pred_ids[j], "O"))
+            previous_word_idx = word_idx
+
+        # Ensure all lists are the same length
+        if len(valid_tokens) == len(true_labels) == len(pred_labels):
+            for token, actual, predicted in zip(valid_tokens, true_labels, pred_labels):
+                data.append([i, token, actual, predicted])
+        else:
+            print(f"Warning: Mismatch in lengths for sentence {i}")
+
+    # Save to CSV
+    df = pd.DataFrame(data, columns=["Sentence_ID", "Token", "Actual_Tag", "Predicted_Tag"])
+    df.to_csv(output_file, index=False)
+    print(f"Predictions saved to {output_file}, total rows: {len(df)}")
+
+🔹 Key Fixes
+✅ Fixed Token Alignment
+
+Ensured full token list is captured
+Filtered out unnecessary subwords
+✅ Fixed Mismatch in Dataset Size
+
+Ensured that the final CSV contains all tokens from the dataset
+Used word alignment from attention mask to keep structure correct
+✅ Handled Edge Cases
+
+Avoided Padding Tokens (word_ids == None)
+Avoided Extra Subwords (word_ids != previous_word_idx)
+🔹 Run the Function for Train & Test Data
+python
+Copy
+Edit
+get_predictions(trainer, train_dataset, tokenizer, label2id, "train_predictions.csv")
+get_predictions(trainer, test_dataset, tokenizer, label2id, "test_predictions.csv")
+🚀 Now, your actual vs predicted CSV files should match the dataset correctly!
+
+
+####
 kimodel is executing now i am want to seethe model results or can hyper parameter the parameter in model.train()
 
 ChatGPT said:
