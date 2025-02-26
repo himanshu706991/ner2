@@ -1,4 +1,155 @@
-Actually i wma looking for comparison with dataset train and dataset test the want to understand shape
+dataet_train and dataset_test in this two dataset, i know word and tag are there in list formte but i want thsese file in csv formate with actual and pred tag
+
+ChatGPT said:
+To convert your dataset_train and dataset_test into CSV format with Actual vs Predicted Tags, follow these steps:
+
+1️⃣ Convert Training and Testing Data to CSV Format
+We'll extract the words, actual tags, and predicted tags from both datasets and save them in structured CSV files.
+
+🔹 Convert Training Data to CSV
+python
+Copy
+Edit
+import pandas as pd
+
+train_data = []
+for sentence, actual, predicted in zip(X_train, true_labels_train, predicted_labels_train):
+    for word, act_tag, pred_tag in zip(sentence, actual, predicted):
+        train_data.append([word, act_tag, pred_tag])
+
+train_df = pd.DataFrame(train_data, columns=["Word", "Actual_Tag", "Predicted_Tag"])
+train_df.to_csv("train_actual_vs_predicted.csv", index=False)
+print("Training data saved to train_actual_vs_predicted.csv")
+🔹 Convert Testing Data to CSV
+python
+Copy
+Edit
+test_data = []
+for sentence, actual, predicted in zip(X_test, true_labels_test, predicted_labels_test):
+    for word, act_tag, pred_tag in zip(sentence, actual, predicted):
+        test_data.append([word, act_tag, pred_tag])
+
+test_df = pd.DataFrame(test_data, columns=["Word", "Actual_Tag", "Predicted_Tag"])
+test_df.to_csv("test_actual_vs_predicted.csv", index=False)
+print("Testing data saved to test_actual_vs_predicted.csv")
+2️⃣ What These CSVs Contain
+Each CSV file (train_actual_vs_predicted.csv and test_actual_vs_predicted.csv) will have the following columns:
+
+Word	Actual_Tag	Predicted_Tag
+Apple	B-ORG	B-ORG
+is	O	O
+a	O	O
+company	O	B-ORG
+in	O	O
+USA	B-LOC	B-LOC
+3️⃣ Verify CSV File Structure
+python
+Copy
+Edit
+print(train_df.head())
+print(test_df.head())
+Now, you can open train_actual_vs_predicted.csv and test_actual_vs_predicted.csv to analyze the results.
+
+Let me know if you need modifications! 🚀
+
+
+
+
+
+
+You said:
+but how to get pred tag after model execution
+ChatGPT said:
+After model execution, you can obtain the predicted tags by following these steps:
+
+1️⃣ Predict Tags Using the Trained Model
+Once the model (trainer) has been trained using trainer.train(), we need to generate predictions on the test dataset.
+
+🔹 Step 1: Get Predictions from the Model
+python
+Copy
+Edit
+import numpy as np
+
+# Get model predictions
+predictions, labels, _ = trainer.predict(dataset_test)
+
+# Convert logits to predicted labels
+predicted_ids = np.argmax(predictions, axis=2)
+
+# Convert label IDs back to text labels
+true_labels = [[id2label[label] for label in label_seq if label != -100] for label_seq in labels]
+predicted_labels = [[id2label[pred] for pred, label in zip(pred_seq, label_seq) if label != -100] 
+                    for pred_seq, label_seq in zip(predicted_ids, labels)]
+2️⃣ Match Words with Predictions
+We need to match words with their actual tags and predicted tags.
+
+🔹 Step 2: Convert Test Data into CSV Format
+python
+Copy
+Edit
+import pandas as pd
+
+test_data = []
+for sentence, actual, predicted in zip(X_test, true_labels, predicted_labels):
+    for word, act_tag, pred_tag in zip(sentence, actual, predicted):
+        test_data.append([word, act_tag, pred_tag])
+
+# Save to CSV
+test_df = pd.DataFrame(test_data, columns=["Word", "Actual_Tag", "Predicted_Tag"])
+test_df.to_csv("test_actual_vs_predicted.csv", index=False)
+
+print("Test predictions saved to test_actual_vs_predicted.csv")
+3️⃣ Do the Same for Training Data (Optional)
+If you want the actual vs predicted tags for training data, repeat the same steps using dataset_train:
+
+python
+Copy
+Edit
+predictions_train, labels_train, _ = trainer.predict(dataset_train)
+predicted_ids_train = np.argmax(predictions_train, axis=2)
+
+true_labels_train = [[id2label[label] for label in label_seq if label != -100] for label_seq in labels_train]
+predicted_labels_train = [[id2label[pred] for pred, label in zip(pred_seq, label_seq) if label != -100] 
+                          for pred_seq, label_seq in zip(predicted_ids_train, labels_train)]
+
+train_data = []
+for sentence, actual, predicted in zip(X_train, true_labels_train, predicted_labels_train):
+    for word, act_tag, pred_tag in zip(sentence, actual, predicted):
+        train_data.append([word, act_tag, pred_tag])
+
+train_df = pd.DataFrame(train_data, columns=["Word", "Actual_Tag", "Predicted_Tag"])
+train_df.to_csv("train_actual_vs_predicted.csv", index=False)
+
+print("Train predictions saved to train_actual_vs_predicted.csv")
+4️⃣ Verify CSV Files
+To ensure that the predictions are correctly stored, open the CSV files:
+
+python
+Copy
+Edit
+print(pd.read_csv("test_actual_vs_predicted.csv").head())
+print(pd.read_csv("train_actual_vs_predicted.csv").head())
+📌 Final Output
+You will get two CSV files:
+
+1️⃣ train_actual_vs_predicted.csv
+2️⃣ test_actual_vs_predicted.csv
+
+Word	Actual_Tag	Predicted_Tag
+Apple	B-ORG	B-ORG
+is	O	O
+a	O	O
+company	O	B-ORG
+in	O	O
+USA	B-LOC	B-LOC
+These files will contain actual vs predicted entity labels for each word.
+
+Let me know if you need further modifications! 🚀
+
+
+
+################Actually i wma looking for comparison with dataset train and dataset test the want to understand shape
 
 ChatGPT said:
 To compare the training and test datasets in terms of shape, entity distribution, and performance, let's analyze:
