@@ -1,4 +1,90 @@
-Here's a complete Named Entity Recognition (NER) pipeline using BERT (bert-base-ner) that includes data preprocessing, model training, evaluation, and saving predictions in CSV format. 🚀
+dataset_tain, and dataet_test l\thesie list firmt file how to get the shape fo thsese file so that i can comparion  with final train.test file which has actual tag 
+
+ChatGPT said:
+Since dataset_train and dataset_test are in list format, and you want to compare them with the final train_predictions.csv and test_predictions.csv, you need to check the shape and structure.
+
+🔹 Checking Shape of dataset_train and dataset_test
+If dataset_train and dataset_test are lists of sentences, where each sentence is a list of word-tag pairs, use:
+
+python
+Copy
+Edit
+print("Train Dataset Size:", len(dataset_train))  # Number of sentences
+print("Test Dataset Size:", len(dataset_test))    # Number of sentences
+
+# Checking the first sentence structure
+print("First Train Sentence:", dataset_train[0])
+print("First Test Sentence:", dataset_test[0])
+🔹 If the output looks like this:
+
+python
+Copy
+Edit
+Train Dataset Size: 5000
+Test Dataset Size: 1000
+First Train Sentence: [('Elon', 'B-PER'), ('Musk', 'I-PER'), ('founded', 'O'), ('SpaceX', 'B-ORG')]
+First Test Sentence: [('Google', 'B-ORG'), ('is', 'O'), ('a', 'O'), ('tech', 'O'), ('giant', 'O')]
+That means the dataset is structured as expected.
+
+🔹 Checking Shape of Final train_predictions.csv and test_predictions.csv
+Now, check if the final CSVs match the original dataset in terms of rows:
+
+python
+Copy
+Edit
+import pandas as pd
+
+df_train = pd.read_csv("train_predictions.csv")
+df_test = pd.read_csv("test_predictions.csv")
+
+print("Train Predictions Shape:", df_train.shape)
+print("Test Predictions Shape:", df_test.shape)
+
+print(df_train.head())  # Check first few rows
+print(df_test.head())   # Check first few rows
+🔹 Expected Output:
+
+python
+Copy
+Edit
+Train Predictions Shape: (50000, 3)  # If 5000 sentences have ~10 words each
+Test Predictions Shape: (10000, 3)
+
+   Word  Actual_Tag  Predicted_Tag
+0  Elon       B-PER         B-PER
+1  Musk       I-PER         I-PER
+2  founded       O             O
+3  SpaceX      B-ORG         B-ORG
+If the row count is different, then some words may have been dropped during preprocessing.
+
+🔹 Comparing the Original Dataset with Final Predictions
+If you want a sentence-level comparison, ensure: 1️⃣ Total words match → Compare sum(len(s) for s in dataset_train) with df_train.shape[0]
+2️⃣ Sentence count matches → Compare len(dataset_train) with df_train["Sentence_ID"].nunique()
+
+python
+Copy
+Edit
+# Check total number of words
+train_word_count = sum(len(sentence) for sentence in dataset_train)
+test_word_count = sum(len(sentence) for sentence in dataset_test)
+
+print("Total Words in Train Dataset:", train_word_count)
+print("Total Words in Train Predictions:", df_train.shape[0])
+
+print("Total Words in Test Dataset:", test_word_count)
+print("Total Words in Test Predictions:", df_test.shape[0])
+🔹 If the numbers don't match, some words might have been dropped during tokenization.
+
+✅ What to Do If the Shapes Don't Match?
+1️⃣ Check if special tokens ([CLS], [SEP]) are affecting token count.
+2️⃣ Ensure subword tokenization didn't split words incorrectly → Use is_split_into_words=True
+3️⃣ Check dropped words → Compare original dataset and CSV sentence-by-sentence.
+
+Try these steps and let me know if there’s a mismatch! 🚀
+
+
+
+#########################################Here's a complete Named Entity Recognition (NER) pipeline using BERT (bert-base-ner) that includes data preprocessing, model training, evaluation, and saving predictions in CSV format. 🚀
 
 📌 Steps in the Pipeline
 1️⃣ Load & Preprocess Data (Convert words & labels into BERT format)
