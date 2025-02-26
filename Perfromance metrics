@@ -1,3 +1,25 @@
+
+#####
+
+🔹 Fix: Convert Labels to Strings Before Creating label2id
+Modify the label processing step by ensuring that labels are converted to strings:
+
+python
+Copy
+Edit
+unique_labels = list(set(merged_df["tag"].dropna().astype(str)))  # Convert labels to strings
+label2id = {label: idx for idx, label in enumerate(["O"] + unique_labels)}  # Add "O" for non-entities
+id2label = {idx: label for label, idx in label2id.items()}
+💡 Explanation
+merged_df["tag"].dropna().astype(str): Ensures all labels are strings, avoiding NumPy integer key errors.
+["O"] + unique_labels: Adds "O" (non-entity) as a default label.
+Ensures consistent mapping of labels to integers and back.
+✅ Next Steps
+Run the script again after applying this fix.
+Check if all labels are correctly assigned in label2id.
+Continue training the NER model.
+##############
+
 the file i amgetting train and test very less data and not look like real file that i a using for model
 
 ChatGPT said:
