@@ -1,4 +1,211 @@
-dataet_train and dataset_test in this two dataset, i know word and tag are there in list formte but i want thsese file in csv formate with actual and pred tag
+
+Train loss while execution of trainer.tain()in trainerloss and validation losss in trainer l;osss getting no log
+
+ChatGPT said:
+If you're not seeing training loss (train_loss) and validation loss (eval_loss) logs while executing trainer.train(), here’s how to fix it and ensure you get proper logs:
+
+✅ Fix 1: Enable Detailed Logging
+Set the logging_strategy="steps" in TrainingArguments:
+
+python
+Copy
+Edit
+from transformers import TrainingArguments
+
+training_args = TrainingArguments(
+    output_dir="./results",
+    evaluation_strategy="steps",  # Evaluate at specific steps
+    save_strategy="steps",
+    logging_strategy="steps",  # Logs after every few steps
+    logging_steps=10,  # Set logging frequency
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=3,
+    save_total_limit=2,
+    load_best_model_at_end=True
+)
+Now, logs will be printed every 10 steps.
+
+✅ Fix 2: Manually Check Training Logs
+If logs are still missing, manually print loss at each step:
+
+python
+Copy
+Edit
+trainer.train()
+Then, use:
+
+python
+Copy
+Edit
+trainer.state.log_history  # This stores loss logs
+🔹 If empty ([]), check logging strategy.
+
+✅ Fix 3: Ensure compute_metrics is Defined
+If compute_metrics is missing, loss tracking may fail:
+
+python
+Copy
+Edit
+import numpy as np
+from datasets import load_metric
+
+metric = load_metric("seqeval")
+
+def compute_metrics(p):
+    predictions, labels = p
+    predictions = np.argmax(predictions, axis=2)  # Convert logits to labels
+    return metric.compute(predictions=predictions, references=labels)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=dataset_train,
+    eval_dataset=dataset_test,
+    tokenizer=tokenizer,
+    compute_metrics=compute_metrics
+)
+✅ Fix 4: Run Trainer Evaluation Manually
+If trainer.train() finishes but no logs appear, manually check:
+
+python
+Copy
+Edit
+trainer.evaluate()
+This should print:
+
+python
+Copy
+Edit
+{'eval_loss': 0.432, 'eval_runtime': 3.1, 'eval_samples_per_second': 50.3}
+If eval_loss is missing, check if eval_dataset was provided.
+
+✅ Fix 5: Visualize Loss
+Once training is done, use:
+
+python
+Copy
+Edit
+import pandas as pd
+
+logs = pd.DataFrame(trainer.state.log_history)
+print(logs)
+🔹 If logs are empty, ensure logging_steps is correctly set.
+
+Expected Log Format
+After fixing, logs should appear like:
+
+python
+Copy
+Edit
+{'loss': 0.325, 'learning_rate': 4.5e-5, 'epoch': 1.0}
+{'loss': 0.210, 'learning_rate': 3.2e-5, 'epoch': 2.0}
+{'eval_loss': 0.150, 'epoch': 3.0}
+Try these fixes and let me know if logs still don’t appear! 🚀
+
+
+
+
+
+
+You said:
+but in train loss getting getting no log
+ChatGPT said:
+If you're getting "no log" for train loss in trainer.train(), try these fixes step by step:
+
+✅ Fix 1: Set logging_steps Correctly
+Modify TrainingArguments to ensure logging happens during training:
+
+python
+Copy
+Edit
+from transformers import TrainingArguments
+
+training_args = TrainingArguments(
+    output_dir="./results",
+    evaluation_strategy="steps",
+    save_strategy="steps",
+    logging_strategy="steps",  # ✅ Enable logging
+    logging_steps=10,  # ✅ Set logging frequency
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=3,
+    save_total_limit=2,
+    load_best_model_at_end=True
+)
+🔹 If logging_steps is too high, loss logs won’t appear often.
+
+✅ Fix 2: Manually Print Loss During Training
+Modify the Trainer class by adding a custom callback to print logs:
+
+python
+Copy
+Edit
+from transformers import TrainerCallback
+
+class LossLoggingCallback(TrainerCallback):
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if logs is not None:
+            print(logs)  # ✅ Print logs during training
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=dataset_train,
+    eval_dataset=dataset_test,
+    tokenizer=tokenizer,
+    compute_metrics=compute_metrics,
+    callbacks=[LossLoggingCallback()]  # ✅ Add custom logging callback
+)
+🔹 This will ensure logs are printed at each logging step.
+
+✅ Fix 3: Check Training Logs Manually
+Once training is done, check if loss was logged:
+
+python
+Copy
+Edit
+import pandas as pd
+
+logs = pd.DataFrame(trainer.state.log_history)
+print(logs)
+If logs is empty ([]), logging isn’t set correctly.
+
+✅ Fix 4: Force Logging in train()
+Before running trainer.train(), manually log loss:
+
+python
+Copy
+Edit
+trainer.train(resume_from_checkpoint=False)
+trainer.state.log_history  # ✅ This should contain loss logs
+✅ Fix 5: Evaluate Manually
+If training logs still don’t show, check evaluation logs:
+
+python
+Copy
+Edit
+trainer.evaluate()
+This should output:
+
+python
+Copy
+Edit
+{'eval_loss': 0.432, 'epoch': 3.0}
+Expected Log Output
+After fixing, you should see logs like:
+
+bash
+Copy
+Edit
+{'loss': 0.325, 'learning_rate': 4.5e-5, 'epoch': 1.0}
+{'loss': 0.210, 'learning_rate': 3.2e-5, 'epoch': 2.0}
+{'eval_loss': 0.150, 'epoch': 3.0}
+Try these steps and let me know if logs still don't appear! 🚀
+
+
+
+#################################################################################################dataet_train and dataset_test in this two dataset, i know word and tag are there in list formte but i want thsese file in csv formate with actual and pred tag
 
 ChatGPT said:
 To convert your dataset_train and dataset_test into CSV format with Actual vs Predicted Tags, follow these steps:
