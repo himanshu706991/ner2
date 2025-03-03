@@ -1,0 +1,67 @@
+To save the final output of train and test datasets with actual vs predicted tags, follow this complete approach. 🚀
+
+📌 Steps
+1️⃣ Run Model Predictions on Train & Test Data
+2️⃣ Convert Predictions from IDs to Text Labels
+3️⃣ Align Words with Actual & Predicted Tags
+4️⃣ Save the Results in CSV Format
+
+🔹 Step 1: Generate Predictions
+python
+Copy
+Edit
+import numpy as np
+
+def get_predictions(trainer, dataset):
+    predictions_output = trainer.predict(dataset)
+    predictions = np.argmax(predictions_output.predictions, axis=2)  # Convert logits to label indices
+    labels = predictions_output.label_ids  # Get actual label indices
+
+    true_labels = [[id2label[label] for label in label_seq if label != -100] for label_seq in labels]
+    pred_labels = [[id2label[pred] for pred, label in zip(pred_seq, label_seq) if label != -100] 
+                   for pred_seq, label_seq in zip(predictions, labels)]
+    
+    return true_labels, pred_labels
+✅ This removes padding tokens (-100) to keep only relevant words.
+
+🔹 Step 2: Save Predictions in CSV Format
+python
+Copy
+Edit
+import pandas as pd
+
+def save_predictions(sentences, true_labels, pred_labels, filename):
+    data = []
+    for sentence, actual, predicted in zip(sentences, true_labels, pred_labels):
+        for word, act_tag, pred_tag in zip(sentence, actual, predicted):
+            data.append([word[0], act_tag, pred_tag])
+
+    df = pd.DataFrame(data, columns=["Word", "Actual_Tag", "Predicted_Tag"])
+    df.to_csv(filename, index=False)
+    print(f"✅ Saved: {filename}")
+
+# 🔹 Predict & Save Train Data
+train_true, train_pred = get_predictions(trainer, dataset_train)
+save_predictions(dataset_train, train_true, train_pred, "final_train_predictions.csv")
+
+# 🔹 Predict & Save Test Data
+test_true, test_pred = get_predictions(trainer, dataset_test)
+save_predictions(dataset_test, test_true, test_pred, "final_test_predictions.csv")
+✅ The final output files will be saved as: 1️⃣ final_train_predictions.csv
+2️⃣ final_test_predictions.csv
+
+📂 Expected CSV Output Format
+Word	Actual_Tag	Predicted_Tag
+Elon	B-PER	B-PER
+Musk	I-PER	I-PER
+founded	O	O
+SpaceX	B-ORG	B-ORG
+in	O	O
+2002	B-DATE	B-DATE
+✅ Summary
+Extracted predictions for Train & Test sets
+Converted label IDs into text labels
+Saved results in CSV format for easy comparison
+Now you can compare Actual vs. Predicted Tags in the final files. 🚀
+
+Would you like to add more insights like error analysis? 🔍
