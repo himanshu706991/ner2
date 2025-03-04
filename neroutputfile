@@ -405,3 +405,238 @@ in	1314	O	O
 ✅ Saves final predictions in ner_predictions.csv
 
 🚀 Let me know if you need modifications or explanations! 🔥
+
+####$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$4
+
+
+Complete Named Entity Recognition (NER) Pipeline with Train & Test Predictions
+This pipeline:
+✅ Loads tokens.csv & sentences.csv
+✅ Prepares train & test datasets
+✅ Trains bert-base-ner
+✅ Saves actual vs. predicted NER tags for both train & test data
+
+📌 Steps
+1️⃣ Load Data (tokens.csv + sentences.csv)
+2️⃣ Train-Test Split
+3️⃣ Tokenization & Alignment
+4️⃣ Train BERT (bert-base-ner)
+5️⃣ Evaluate Model Performance
+6️⃣ Save Actual vs. Predicted Tags in Train & Test CSVs
+
+🔹 Step 1: Load Data
+python
+Copy
+Edit
+import pandas as pd
+
+# Load input files
+df_tokens = pd.read_csv("tokens.csv")  # Sentence_ID, Token, Tag
+df_sentences = pd.read_csv("sentences.csv")  # Sentence_ID, Description
+
+# Merge sentence descriptions with tokens
+merged_df = df_tokens.merge(df_sentences, on="Sentence_ID", how="left")
+
+# Fill missing tags with 'O' (Outside of Named Entity)
+merged_df["Tag"] = merged_df["Tag"].fillna("O")
+
+print("Sample Data:")
+print(merged_df.head())
+✅ Merges tokens.csv & sentences.csv and replaces NaN tags with "O"
+
+🔹 Step 2: Train-Test Split
+python
+Copy
+Edit
+from sklearn.model_selection import train_test_split
+
+# Group tokens & labels by sentence
+sentences = merged_df.groupby("Sentence_ID")["Token"].apply(list).tolist()
+labels = merged_df.groupby("Sentence_ID")["Tag"].apply(list).tolist()
+
+# Train-Test Split
+train_sentences, test_sentences, train_labels, test_labels = train_test_split(
+    sentences, labels, test_size=0.2, random_state=42
+)
+
+print(f"Training Samples: {len(train_sentences)}, Testing Samples: {len(test_sentences)}")
+✅ Splits data into 80% train, 20% test
+
+🔹 Step 3: Tokenization & Alignment
+python
+Copy
+Edit
+import torch
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER", use_fast=True)
+
+# Convert labels to numerical format
+unique_labels = list(set(merged_df["Tag"].dropna().unique()))
+label2id = {label: i for i, label in enumerate(["O"] + unique_labels)}
+id2label = {i: label for label, i in label2id.items()}
+
+def tokenize_and_align_labels(sentences, labels):
+    tokenized_inputs = tokenizer(
+        sentences, 
+        is_split_into_words=True,
+        truncation=True,
+        padding=True,
+        return_tensors="pt"
+    )
+
+    aligned_labels = []
+    for i, sentence_labels in enumerate(labels):
+        word_ids = tokenized_inputs.word_ids(batch_index=i)  
+        previous_word_idx = None
+        label_ids = []
+
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore special tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(label2id.get(sentence_labels[word_idx], 0))
+            else:
+                label_ids.append(-100)  # Ignore subwords
+
+            previous_word_idx = word_idx
+
+        aligned_labels.append(label_ids)
+
+    tokenized_inputs["labels"] = torch.tensor(aligned_labels)
+    return tokenized_inputs
+
+# Tokenize datasets
+train_encodings = tokenize_and_align_labels(train_sentences, train_labels)
+test_encodings = tokenize_and_align_labels(test_sentences, test_labels)
+✅ Handles subword tokenization & aligns labels correctly
+
+🔹 Step 4: Prepare Dataset for Training
+python
+Copy
+Edit
+from torch.utils.data import Dataset
+
+class NERDataset(Dataset):
+    def __init__(self, encodings):
+        self.encodings = encodings
+
+    def __len__(self):
+        return len(self.encodings["input_ids"])
+
+    def __getitem__(self, idx):
+        return {key: val[idx] for key, val in self.encodings.items()}
+
+train_dataset = NERDataset(train_encodings)
+test_dataset = NERDataset(test_encodings)
+✅ Creates PyTorch datasets for training & testing
+
+🔹 Step 5: Train BERT Model
+python
+Copy
+Edit
+from transformers import AutoModelForTokenClassification, Trainer, TrainingArguments
+
+model = AutoModelForTokenClassification.from_pretrained(
+    "dslim/bert-base-NER",
+    num_labels=len(label2id),
+    id2label=id2label,
+    label2id=label2id
+)
+
+training_args = TrainingArguments(
+    output_dir="./ner_model",
+    evaluation_strategy="epoch",
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    logging_strategy="steps",
+    logging_steps=10
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=test_dataset,
+    tokenizer=tokenizer
+)
+
+trainer.train()
+✅ Trains bert-base-ner on your dataset
+
+🔹 Step 6: Evaluate Model Performance
+python
+Copy
+Edit
+import numpy as np
+from datasets import load_metric
+
+metric = load_metric("seqeval")
+
+def compute_metrics(p):
+    predictions, labels = p
+    predictions = np.argmax(predictions, axis=2)
+
+    true_labels = [[id2label[label] for label in label_seq if label != -100] for label_seq in labels]
+    pred_labels = [[id2label[pred] for pred, label in zip(pred_seq, label_seq) if label != -100] 
+                   for pred_seq, label_seq in zip(predictions, labels)]
+
+    results = metric.compute(predictions=pred_labels, references=true_labels)
+    return {
+        "precision": results["overall_precision"],
+        "recall": results["overall_recall"],
+        "f1": results["overall_f1"],
+        "accuracy": results["overall_accuracy"],
+    }
+
+trainer.evaluate()
+✅ Computes precision, recall, and F1-score
+
+🔹 Step 7: Save Train & Test Predictions in CSV
+python
+Copy
+Edit
+def save_predictions(dataset, filename):
+    predictions_output = trainer.predict(dataset)
+    predictions = np.argmax(predictions_output.predictions, axis=2)
+    labels = predictions_output.label_ids
+
+    data = []
+
+    for i in range(len(dataset)):
+        input_ids = dataset[i]["input_ids"].tolist()
+        tokens = tokenizer.convert_ids_to_tokens(input_ids, skip_special_tokens=True)
+
+        for j, token in enumerate(tokens):
+            actual_tag = id2label.get(labels[i][j], "O")
+            predicted_tag = id2label.get(predictions[i][j], "O")
+
+            data.append([token, input_ids[j], actual_tag, predicted_tag])
+
+    df = pd.DataFrame(data, columns=["Token", "Token_ID", "Actual_Tag", "Predicted_Tag"])
+    df.to_csv(filename, index=False)
+    print(f"✅ Saved: {filename}")
+
+# Save Train & Test Predictions
+save_predictions(train_dataset, "final_train_predictions.csv")
+save_predictions(test_dataset, "final_test_predictions.csv")
+✅ Creates CSVs with Actual vs. Predicted NER tags for Train & Test
+
+📂 Expected Train & Test CSV Output
+Token	Token_ID	Actual_Tag	Predicted_Tag
+Elon	1234	B-PER	B-PER
+Musk	5678	I-PER	I-PER
+founded	9101	O	O
+SpaceX	1112	B-ORG	B-ORG
+in	1314	O	O
+2002	1516	B-DATE	B-DATE
+🚀 Summary
+✅ Loads tokens.csv & sentences.csv
+✅ Splits into Train & Test sets
+✅ Tokenizes & aligns labels
+✅ Trains bert-base-ner
+✅ Saves predictions for Train & Test in CSVs
+
+🚀 Now you can compare actual vs predicted NER tags! Let me know if you need any modifications!
