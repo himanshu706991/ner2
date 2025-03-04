@@ -1,3 +1,221 @@
+Keys error: word_ids in both cases i am getting error
+ChatGPT said:
+🔍 Issue: KeyError: word_ids in Predictions
+The error occurs because word_ids() is not available in some tokenizers (especially when using a tokenizer that doesn’t support word alignment).
+
+✅ Fix 1: Ensure Correct Tokenizer Usage
+Make sure your tokenizer supports word alignment by using BertTokenizerFast.
+
+python
+Copy
+Edit
+from transformers import AutoTokenizer
+
+# Ensure using a fast tokenizer that supports word_ids()
+tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER", use_fast=True)
+✅ Why?
+Only Fast Tokenizers (like BertTokenizerFast) support word_ids() for word alignment.
+
+✅ Fix 2: Use .word_ids(batch_index=i) Properly
+Modify the tokenization & prediction functions without assuming word_ids() is always present.
+
+🔹 Correct Tokenization Function
+python
+Copy
+Edit
+def tokenize_and_align_labels(sentences, labels, tokenizer):
+    tokenized_inputs = tokenizer(
+        [[word for word in sentence] for sentence in sentences],
+        truncation=True,
+        padding=True,
+        is_split_into_words=True,
+        return_tensors="pt"
+    )
+
+    if not hasattr(tokenized_inputs, "word_ids"):
+        raise ValueError("Error: The tokenizer does not support `word_ids`. Use a `FastTokenizer`.")
+
+    aligned_labels = []
+    for i, sentence_labels in enumerate(labels):
+        word_ids = tokenized_inputs.word_ids(batch_index=i)  # ✅ Ensures correct batch handling
+        label_ids = []
+        previous_word_idx = None
+
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore special tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(label2id.get(sentence_labels[word_idx], 0))  # Assign correct label
+            else:
+                label_ids.append(-100)  # Ignore subwords
+
+            previous_word_idx = word_idx
+
+        aligned_labels.append(label_ids)
+
+    tokenized_inputs["labels"] = torch.tensor(aligned_labels)
+    return tokenized_inputs
+✅ Fixes:
+
+Ensures word_ids() exists before calling it.
+Uses batch_index=i correctly (avoids missing word mappings).
+✅ Fix 3: Handle word_ids() in Prediction Function
+Modify the prediction function to ensure word alignment.
+
+🔹 Correct Prediction Function
+python
+Copy
+Edit
+import numpy as np
+
+def get_predictions(trainer, dataset, tokenizer):
+    predictions_output = trainer.predict(dataset)
+    predictions = np.argmax(predictions_output.predictions, axis=2)  # Convert logits to label indices
+    labels = predictions_output.label_ids  # Get actual label indices
+
+    output_list = []
+
+    for i in range(len(dataset)):
+        input_ids = dataset[i]["input_ids"].tolist()
+        
+        # Ensure word_ids exists
+        if not hasattr(dataset[i], "word_ids"):
+            raise ValueError("Error: `word_ids` not found in dataset. Ensure correct tokenizer is used.")
+        
+        word_ids = dataset[i]["word_ids"]
+        tokens = tokenizer.convert_ids_to_tokens(input_ids, skip_special_tokens=True)
+
+        sentence_tokens = []
+        sentence_true_labels = []
+        sentence_pred_labels = []
+
+        previous_word_idx = None
+        for j, word_idx in enumerate(word_ids):
+            if word_idx is None or word_idx == previous_word_idx:
+                continue  # Ignore subwords and padding
+
+            sentence_tokens.append(tokens[j])
+            sentence_true_labels.append(id2label.get(int(labels[i][word_idx]), "O"))
+            sentence_pred_labels.append(id2label.get(int(predictions[i][word_idx]), "O"))
+
+            previous_word_idx = word_idx
+
+        output_list.append([sentence_tokens, sentence_true_labels, sentence_pred_labels])
+
+    return output_list
+✅ Fixes:
+
+Checks if word_ids exists before using it.
+Ensures subwords don’t get duplicate labels.
+Properly maps predictions back to words.
+✅ Final Steps
+1️⃣ Get Train & Test Predictions
+python
+Copy
+Edit
+train_predictions_list = get_predictions(trainer, dataset_train, tokenizer)
+test_predictions_list = get_predictions(trainer, dataset_test, tokenizer)
+2️⃣ Print & Verify Outputs
+python
+Copy
+Edit
+print("Train Example:", train_predictions_list[:3])
+print("\nTest Example:", test_predictions_list[:3])
+3️⃣ Save to JSON (Optional)
+python
+Copy
+Edit
+import json
+
+with open("train_predictions.json", "w") as f:
+    json.dump(train_predictions_list, f, indent=4)
+
+with open("test_predictions.json", "w") as f:
+    json.dump(test_predictions_list, f, indent=4)
+
+print("✅ Saved train_predictions.json and test_predictions.json")
+🎯 Summary
+✅ Fixes KeyError: word_ids by ensuring Fast Tokenizer (use_fast=True).
+✅ Checks if word_ids exists before calling it.
+✅ Handles subword alignment correctly (avoids extra/missing tokens).
+✅ Saves results in a clean list format or JSON file.
+
+🚀 Try these fixes & let me know if the error is resolved! 🔥
+
+
+
+
+
+You said:
+ok this is for list formate , i also need in csv, tokenid,predtag,actual tag
+ChatGPT said:
+✅ Saving Predictions in CSV Format (Token, Token ID, Actual Tag, Predicted Tag)
+Since you need Token, Token ID, Actual Tag, and Predicted Tag stored in a CSV file, we'll modify our function accordingly.
+
+🔹 Step 1: Modify Prediction Function for CSV
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+
+def get_predictions_for_csv(trainer, dataset, tokenizer, filename):
+    predictions_output = trainer.predict(dataset)
+    predictions = np.argmax(predictions_output.predictions, axis=2)  # Convert logits to label indices
+    labels = predictions_output.label_ids  # Get actual label indices
+
+    data = []
+
+    for i in range(len(dataset)):
+        input_ids = dataset[i]["input_ids"].tolist()
+        tokens = tokenizer.convert_ids_to_tokens(input_ids, skip_special_tokens=True)
+        word_ids = dataset[i].get("word_ids", None)  # Get word mappings if available
+
+        if word_ids is None:
+            raise ValueError("Error: `word_ids` not found in dataset. Ensure correct tokenizer is used.")
+
+        previous_word_idx = None
+        for j, word_idx in enumerate(word_ids):
+            if word_idx is None or word_idx == previous_word_idx:
+                continue  # Ignore subwords and padding
+
+            token_id = input_ids[j]
+            actual_tag = id2label.get(int(labels[i][word_idx]), "O")  # Get actual tag
+            predicted_tag = id2label.get(int(predictions[i][word_idx]), "O")  # Get predicted tag
+
+            data.append([tokens[j], token_id, actual_tag, predicted_tag])
+            previous_word_idx = word_idx
+
+    # Create DataFrame and Save CSV
+    df = pd.DataFrame(data, columns=["Token", "Token_ID", "Actual_Tag", "Predicted_Tag"])
+    df.to_csv(filename, index=False)
+    print(f"✅ Saved: {filename}")
+🔹 Step 2: Generate CSV Files for Train & Test Data
+python
+Copy
+Edit
+get_predictions_for_csv(trainer, dataset_train, tokenizer, "final_train_predictions.csv")
+get_predictions_for_csv(trainer, dataset_test, tokenizer, "final_test_predictions.csv")
+📂 Expected CSV Output Format
+Token	Token_ID	Actual_Tag	Predicted_Tag
+Elon	1234	B-PER	B-PER
+Musk	5678	I-PER	I-PER
+founded	9101	O	O
+SpaceX	1112	B-ORG	B-ORG
+in	1314	O	O
+2002	1516	B-DATE	B-DATE
+🚀 Summary
+✅ Fixes missing/misaligned tokens issue
+✅ Ensures Token, Token ID, Actual Tag, and Predicted Tag are aligned
+✅ Saves results in a structured CSV format for Train & Test data
+
+Now you can compare actual vs predicted tags in CSV easily! 🎯 Let me know if you need further refinements. 🚀🔥
+
+
+
+
+
+###############################################################################################3
 Yes! You can store the output in a list format, where each entry contains:
 1️⃣ Tokens (Words)
 2️⃣ Actual Tags (Ground Truth)
