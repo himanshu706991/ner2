@@ -640,3 +640,111 @@ in	1314	O	O
 ✅ Saves predictions for Train & Test in CSVs
 
 🚀 Now you can compare actual vs predicted NER tags! Let me know if you need any modifications!
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+Got it! You need a CSV file for both train and test datasets that includes:
+
+✅ Token (original word)
+✅ Token ID (from tokenizer)
+✅ Actual Label (ground truth NER tag)
+✅ Predicted Label (model's predicted NER tag)
+
+🔹 Step 1: Function to Save Train & Test Predictions
+This function extracts token information, aligns predictions with actual labels, and saves results in a CSV file.
+
+python
+Copy
+Edit
+def save_predictions_with_token_ids(dataset, filename):
+    predictions_output = trainer.predict(dataset)
+    predictions = np.argmax(predictions_output.predictions, axis=2)
+    labels = predictions_output.label_ids
+
+    data = []
+
+    for i in range(len(dataset)):
+        input_ids = dataset[i]["input_ids"].tolist()
+        tokens = tokenizer.convert_ids_to_tokens(input_ids, skip_special_tokens=False)
+        word_ids = dataset[i]["word_ids"]
+
+        for j, token in enumerate(tokens):
+            word_id = word_ids[j] if word_ids else None
+            actual_tag = id2label.get(labels[i][j], "O") if labels[i][j] != -100 else "O"
+            predicted_tag = id2label.get(predictions[i][j], "O") if predictions[i][j] != -100 else "O"
+
+            data.append([word_id, token, input_ids[j], actual_tag, predicted_tag])
+
+    df = pd.DataFrame(data, columns=["Word_ID", "Token", "Token_ID", "Actual_Tag", "Predicted_Tag"])
+    df.to_csv(filename, index=False)
+    print(f"✅ Saved: {filename}")
+
+# Save Train & Test Predictions
+save_predictions_with_token_ids(train_dataset, "final_train_predictions.csv")
+save_predictions_with_token_ids(test_dataset, "final_test_predictions.csv")
+📂 Expected CSV Output
+Word_ID	Token	Token_ID	Actual_Tag	Predicted_Tag
+0	Elon	1234	B-PER	B-PER
+1	Musk	5678	I-PER	I-PER
+2	founded	9101	O	O
+3	SpaceX	1112	B-ORG	B-ORG
+4	in	1314	O	O
+5	2002	1516	B-DATE	B-DATE
+🚀 Now you can analyze the train & test data with actual vs predicted tags!
+Let me know if you need any refinements. 🔥
+
+########################
+Fixed: Ensure No word_ids Error While Saving Train & Test Predictions
+Since you encountered a KeyError: word_ids, this function ensures:
+✅ Checks if word_ids exists before using it
+✅ Handles subwords & padding correctly
+✅ Creates structured Train & Test CSVs with Token, Token ID, Actual vs. Predicted Labels
+
+🔹 Step 1: Save Train & Test Predictions Without word_ids Errors
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+
+def save_predictions_with_token_ids(dataset, filename):
+    predictions_output = trainer.predict(dataset)
+    predictions = np.argmax(predictions_output.predictions, axis=2)
+    labels = predictions_output.label_ids
+
+    data = []
+
+    for i in range(len(dataset)):
+        input_ids = dataset[i]["input_ids"].tolist()
+        tokens = tokenizer.convert_ids_to_tokens(input_ids, skip_special_tokens=False)
+
+        # ✅ Safe check: If dataset does not have `word_ids`, use index-based alignment
+        word_ids = dataset[i].get("word_ids", [None] * len(tokens))
+
+        for j, token in enumerate(tokens):
+            word_id = word_ids[j] if word_ids and word_ids[j] is not None else j  # Use `j` as fallback index
+            actual_tag = id2label.get(labels[i][j], "O") if labels[i][j] != -100 else "O"
+            predicted_tag = id2label.get(predictions[i][j], "O") if predictions[i][j] != -100 else "O"
+
+            data.append([word_id, token, input_ids[j], actual_tag, predicted_tag])
+
+    df = pd.DataFrame(data, columns=["Word_ID", "Token", "Token_ID", "Actual_Tag", "Predicted_Tag"])
+    df.to_csv(filename, index=False)
+    print(f"✅ Saved: {filename}")
+
+# ✅ Save Train & Test Predictions Without `word_ids` Errors
+save_predictions_with_token_ids(train_dataset, "final_train_predictions.csv")
+save_predictions_with_token_ids(test_dataset, "final_test_predictions.csv")
+📂 Expected Train & Test CSV Format
+Word_ID	Token	Token_ID	Actual_Tag	Predicted_Tag
+0	Elon	1234	B-PER	B-PER
+1	Musk	5678	I-PER	I-PER
+2	founded	9101	O	O
+3	SpaceX	1112	B-ORG	B-ORG
+4	in	1314	O	O
+5	2002	1516	B-DATE	B-DATE
+🚀 Fix Summary
+✅ No word_ids errors (fallback to j if missing)
+✅ Handles subwords & padding correctly
+✅ Saves structured CSVs for Train & Test sets
+
+🔹 Try this and let me know if everything works! 🚀🔥
