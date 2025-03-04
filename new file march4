@@ -1,3 +1,105 @@
+Yes! You can store the output in a list format, where each entry contains:
+1️⃣ Tokens (Words)
+2️⃣ Actual Tags (Ground Truth)
+3️⃣ Predicted Tags (Model Output)
+
+✅ Storing Output in a List Format
+Modify the function to return the output as a list of lists instead of a CSV file:
+
+python
+Copy
+Edit
+import numpy as np
+
+def get_predictions(trainer, dataset, tokenizer):
+    predictions_output = trainer.predict(dataset)
+    predictions = np.argmax(predictions_output.predictions, axis=2)  # Convert logits to label indices
+    labels = predictions_output.label_ids  # Get actual label indices
+
+    output_list = []  # Store final output in list format
+
+    for i in range(len(dataset)):
+        input_ids = dataset[i]["input_ids"].tolist()  # Convert token IDs to tokens
+        word_ids = dataset[i]["word_ids"]
+        tokens = tokenizer.convert_ids_to_tokens(input_ids, skip_special_tokens=True)
+
+        sentence_tokens = []
+        sentence_true_labels = []
+        sentence_pred_labels = []
+
+        previous_word_idx = None
+        for j, word_idx in enumerate(word_ids):
+            if word_idx is None or word_idx == previous_word_idx:
+                continue  # Ignore subwords and padding
+            
+            sentence_tokens.append(tokens[j])  # Store token
+            sentence_true_labels.append(id2label.get(int(labels[i][word_idx]), "O"))  # Actual tag
+            sentence_pred_labels.append(id2label.get(int(predictions[i][word_idx]), "O"))  # Predicted tag
+
+            previous_word_idx = word_idx
+
+        # Store as a list: [tokens_list, actual_tags_list, predicted_tags_list]
+        output_list.append([sentence_tokens, sentence_true_labels, sentence_pred_labels])
+
+    return output_list
+✅ Get Train & Test Predictions in List Format
+python
+Copy
+Edit
+train_predictions_list = get_predictions(trainer, dataset_train, tokenizer)
+test_predictions_list = get_predictions(trainer, dataset_test, tokenizer)
+
+# Example: Check the first few sentences
+print("Train Example:", train_predictions_list[:3])
+print("\nTest Example:", test_predictions_list[:3])
+📌 Example Output (List Format)
+python
+Copy
+Edit
+[
+    [
+        ['Elon', 'Musk', 'founded', 'SpaceX', 'in', '2002', '.'],  # Tokens
+        ['B-PER', 'I-PER', 'O', 'B-ORG', 'O', 'B-DATE', 'O'],  # Actual Tags
+        ['B-PER', 'I-PER', 'O', 'B-ORG', 'O', 'B-DATE', 'O']   # Predicted Tags
+    ],
+    [
+        ['Google', 'is', 'a', 'tech', 'company', '.'],
+        ['B-ORG', 'O', 'O', 'O', 'O', 'O'],
+        ['B-ORG', 'O', 'O', 'O', 'O', 'O']
+    ]
+]
+✅ Each sentence is stored as a nested list with [Tokens, Actual Tags, Predicted Tags].
+
+🚀 Benefits of List Format
+✅ Easy to process in Python (can iterate over sentences easily).
+✅ No formatting issues like CSV (ensures all words align correctly).
+✅ Can be saved in JSON for better readability.
+✅ Save Output to JSON (Optional)
+If you want to save this structured format to a file:
+
+python
+Copy
+Edit
+import json
+
+with open("train_predictions.json", "w") as f:
+    json.dump(train_predictions_list, f, indent=4)
+
+with open("test_predictions.json", "w") as f:
+    json.dump(test_predictions_list, f, indent=4)
+
+print("✅ Saved train_predictions.json and test_predictions.json")
+This will store the structured format in JSON.
+
+🎯 Summary
+You can now store output in a structured list format:
+[Tokens, Actual Tags, Predicted Tags]
+No subword issues, padding issues, or misaligned tokens.
+Optionally save the results in JSON for easy visualization.
+Try this and let me know if you need further modifications! 🚀🔥
+
+
+######
 
 🔍 Issue: Tokens Not Aligning Properly in Final CSV
 If your final train/test CSV files have errors such as:
