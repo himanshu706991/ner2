@@ -1,4 +1,68 @@
- Issue: KeyError: word_ids Not Found in Dataset
+🔍 Issue: Pre-tokenized input sequence must be a union of pre-tokenized input sequences
+This error occurs when BERT expects tokenized input but receives a raw string instead of a list of words.
+
+✅ Fix: Ensure sentences is Properly Tokenized
+Modify your tokenize_and_align_labels() function to split sentences into tokens before passing them to the tokenizer.
+
+🔹 Correct Tokenization Function
+python
+Copy
+Edit
+def tokenize_and_align_labels(sentences, labels):
+    # ✅ Ensure each sentence is a list of words (not a string)
+    if isinstance(sentences[0], str):
+        sentences = [sentence.split() for sentence in sentences]
+
+    tokenized_inputs = tokenizer(
+        sentences, 
+        is_split_into_words=True,  # ✅ Ensures correct alignment
+        truncation=True,
+        padding=True,
+        return_tensors="pt"
+    )
+
+    aligned_labels = []
+    for i, sentence_labels in enumerate(labels):
+        word_ids = tokenized_inputs.word_ids(batch_index=i)
+        previous_word_idx = None
+        label_ids = []
+
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore special tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(label2id.get(sentence_labels[word_idx], 0))
+            else:
+                label_ids.append(-100)  # Ignore subwords
+
+            previous_word_idx = word_idx
+
+    tokenized_inputs["labels"] = torch.tensor(aligned_labels)
+    return tokenized_inputs
+✅ Fix: Check Input Data Format
+Before calling the tokenizer, verify your sentences.
+
+python
+Copy
+Edit
+print("Sample Sentence:", train_sentences[0])  # Should be a list of words, NOT a single string
+print("Sample Labels:", train_labels[0])
+🔹 If train_sentences[0] is a single string, split it into words:
+
+python
+Copy
+Edit
+train_sentences = [sentence.split() if isinstance(sentence, str) else sentence for sentence in train_sentences]
+test_sentences = [sentence.split() if isinstance(sentence, str) else sentence for sentence in test_sentences]
+🚀 Final Fix Summary
+✅ Ensures sentences are tokenized before passing to tokenizer()
+✅ Prevents pre-tokenized input sequence error
+✅ Handles subwords correctly for NER alignment
+
+Try this and let me know if it works! 🚀
+
+$$$$$$$$$$$$$$$4
+Issue: KeyError: word_ids Not Found in Dataset
 The error means that word_ids() is not stored inside your train_dataset and test_dataset.
 
 🔹 Step 1: Debug and Verify if word_ids() Exists
