@@ -1,0 +1,206 @@
+Got it! You need a complete NER pipeline where:
+1️⃣ Train & Save the NER Model using bert-base-ner
+2️⃣ Load Model for Predictions on new test data
+3️⃣ Generate Confusion Matrix comparing actual vs. predicted tags
+
+🔹 Step 1: Train & Save the NER Model
+python
+Copy
+Edit
+import pandas as pd
+import torch
+from torch.utils.data import Dataset
+from transformers import AutoTokenizer, AutoModelForTokenClassification, Trainer, TrainingArguments
+
+# Load input files
+df_tokens = pd.read_csv("tokens.csv")  # Sentence_ID, Token, Tag
+df_sentences = pd.read_csv("sentences.csv")  # Sentence_ID, Description
+
+# Merge sentence descriptions with tokens
+merged_df = df_tokens.merge(df_sentences, on="Sentence_ID", how="left")
+merged_df["Tag"] = merged_df["Tag"].fillna("O")  # Replace NaN tags with "O"
+
+# Group tokens & labels by sentence
+sentences = merged_df.groupby("Sentence_ID")["Token"].apply(list).tolist()
+labels = merged_df.groupby("Sentence_ID")["Tag"].apply(list).tolist()
+
+# Load tokenizer
+tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER", use_fast=True)
+
+# Convert labels to numerical format
+unique_labels = list(set(merged_df["Tag"].dropna().unique()))
+label2id = {label: i for i, label in enumerate(["O"] + unique_labels)}
+id2label = {i: label for label, i in label2id.items()}
+
+# Tokenization & Alignment Function
+def tokenize_and_align_labels(sentences, labels):
+    tokenized_inputs = tokenizer(
+        sentences, 
+        is_split_into_words=True,
+        truncation=True,
+        padding=True,
+        return_tensors="pt"
+    )
+
+    aligned_labels = []
+    for i, sentence_labels in enumerate(labels):
+        word_ids = tokenized_inputs.word_ids(batch_index=i)
+        previous_word_idx = None
+        label_ids = []
+
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore special tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(label2id.get(sentence_labels[word_idx], 0))
+            else:
+                label_ids.append(-100)  # Ignore subwords
+
+            previous_word_idx = word_idx
+
+        aligned_labels.append(label_ids)
+
+    tokenized_inputs["labels"] = torch.tensor(aligned_labels)
+    return tokenized_inputs
+
+# Tokenize dataset
+train_encodings = tokenize_and_align_labels(sentences, labels)
+
+# Dataset Class
+class NERDataset(Dataset):
+    def __init__(self, encodings):
+        self.encodings = encodings
+
+    def __len__(self):
+        return len(self.encodings["input_ids"])
+
+    def __getitem__(self, idx):
+        return {key: val[idx] for key, val in self.encodings.items()}
+
+dataset = NERDataset(train_encodings)
+
+# Load Model
+model = AutoModelForTokenClassification.from_pretrained(
+    "dslim/bert-base-NER",
+    num_labels=len(label2id),
+    id2label=id2label,
+    label2id=label2id
+)
+
+# Training Arguments
+training_args = TrainingArguments(
+    output_dir="./ner_model",
+    evaluation_strategy="epoch",
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    logging_strategy="steps",
+    logging_steps=10
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=dataset,
+    tokenizer=tokenizer
+)
+
+# Train & Save Model
+trainer.train()
+model.save_pretrained("ner_model")
+tokenizer.save_pretrained("ner_model")
+print("✅ Model Trained & Saved as 'ner_model'")
+✅ Trains and Saves bert-base-ner Model
+
+🔹 Step 2: Load Model & Predict on New Data
+python
+Copy
+Edit
+import numpy as np
+import pandas as pd
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+
+# Load Model
+model = AutoModelForTokenClassification.from_pretrained("ner_model")
+tokenizer = AutoTokenizer.from_pretrained("ner_model")
+
+# Load New Test Data
+df_test = pd.read_csv("test_tokens.csv")  # Sentence_ID, Token, Actual_Tag
+
+# Group tokens & labels by sentence
+test_sentences = df_test.groupby("Sentence_ID")["Token"].apply(list).tolist()
+test_labels = df_test.groupby("Sentence_ID")["Actual_Tag"].apply(list).tolist()
+
+# Tokenization & Prediction Function
+def predict_ner(sentences):
+    predictions_list = []
+    
+    for sentence in sentences:
+        inputs = tokenizer(sentence, is_split_into_words=True, return_tensors="pt", truncation=True, padding=True)
+        with torch.no_grad():
+            outputs = model(**inputs)
+
+        predictions = torch.argmax(outputs.logits, dim=2)[0].tolist()
+        predicted_labels = [id2label[p] for p in predictions]
+
+        predictions_list.append(predicted_labels)
+    
+    return predictions_list
+
+# Get Predictions
+predicted_labels = predict_ner(test_sentences)
+
+# Save Predictions
+df_test["Predicted_Tag"] = [tag for pred in predicted_labels for tag in pred]
+df_test.to_csv("test_predictions.csv", index=False)
+print("✅ Predictions Saved in 'test_predictions.csv'")
+✅ Loads the model and predicts labels for fresh test data
+
+🔹 Step 3: Generate Confusion Matrix
+python
+Copy
+Edit
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Flatten actual & predicted labels
+actual_labels = df_test["Actual_Tag"].tolist()
+predicted_labels = df_test["Predicted_Tag"].tolist()
+
+# Filter only valid labels (exclude "O" if needed)
+valid_labels = sorted(set(actual_labels + predicted_labels))
+conf_matrix = confusion_matrix(actual_labels, predicted_labels, labels=valid_labels)
+
+# Plot Confusion Matrix
+plt.figure(figsize=(10, 8))
+sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=valid_labels, yticklabels=valid_labels)
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("NER Confusion Matrix")
+plt.show()
+
+# Print Classification Report
+print("NER Model Performance:")
+print(classification_report(actual_labels, predicted_labels))
+✅ Generates confusion matrix & classification report
+
+📂 Expected Final Outputs
+1️⃣ ner_model/ → Model files (pytorch_model.bin, config.json, etc.)
+2️⃣ test_predictions.csv → Token-wise predictions
+Sentence_ID	Token	Actual_Tag	Predicted_Tag
+1	Elon	B-PER	B-PER
+1	Musk	I-PER	I-PER
+1	founded	O	O
+1	SpaceX	B-ORG	B-ORG
+3️⃣ Confusion Matrix & Report
+✅ Visualizes misclassified tags
+✅ Precision, Recall, and F1-score per tag
+
+🚀 Summary
+✔ Trains and Saves bert-base-ner Model
+✔ Loads Model & Makes Predictions on New Data
+✔ Generates Confusion Matrix & Performance Report
+
+Now you can pass fresh test files, predict token-level NER labels, and analyze errors! 🚀🔥 Let me know if you need modifications!
