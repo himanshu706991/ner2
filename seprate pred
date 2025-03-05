@@ -1,4 +1,94 @@
+Issue: "Pre-tokenized encode input must be a union of pretokenized input sequences"
+This error occurs when is_split_into_words=True is used incorrectly. The tokenizer expects a list of words (tokens), but it might be getting a string instead.
 
+✅ Fix: Ensure Sentences Are Properly Tokenized Before Tokenization
+Before passing sentences to the tokenizer, make sure they are lists of words.
+
+python
+Copy
+Edit
+# ✅ Ensure each sentence is a list of words, not a string
+train_sentences = [sentence.split() if isinstance(sentence, str) else sentence for sentence in train_sentences]
+val_sentences = [sentence.split() if isinstance(sentence, str) else sentence for sentence in val_sentences]
+✅ This ensures every sentence is a list of tokens (words), not a single string.
+
+✅ Fix: Modify Tokenization Function
+🔹 Corrected tokenize_and_align_labels() Function
+python
+Copy
+Edit
+def tokenize_and_align_labels(sentences, labels):
+    # ✅ Ensure sentences are in the correct format (list of words)
+    if isinstance(sentences[0], str):  
+        sentences = [sentence.split() for sentence in sentences]  
+
+    tokenized_inputs = tokenizer(
+        sentences, 
+        is_split_into_words=True,  # ✅ Ensure proper word alignment
+        truncation=True,
+        padding=True,
+        return_tensors="pt"
+    )
+
+    aligned_labels = []
+    for i, sentence_labels in enumerate(labels):
+        word_ids = tokenized_inputs.word_ids(batch_index=i)  # ✅ Get word IDs
+        previous_word_idx = None
+        label_ids = []
+
+        for word_idx in word_ids:
+            if word_idx is None:
+                label_ids.append(-100)  # Ignore special tokens
+            elif word_idx != previous_word_idx:
+                label_ids.append(label2id.get(sentence_labels[word_idx], 0))
+            else:
+                label_ids.append(-100)  # Ignore subwords
+
+            previous_word_idx = word_idx
+
+        aligned_labels.append(label_ids)
+
+    tokenized_inputs["labels"] = torch.tensor(aligned_labels)
+    return tokenized_inputs
+✅ Fixes:
+
+Ensures sentences are passed as lists of words before tokenization
+Prevents pre-tokenized encode input must be pretokenized error
+✅ Fix: Debug Input Before Tokenization
+Before calling the tokenize_and_align_labels() function, print sample sentences.
+
+python
+Copy
+Edit
+print("Sample Train Sentence:", train_sentences[0])  # Should be a list of words, NOT a string
+print("Sample Validation Sentence:", val_sentences[0])  # Should be a list of words
+🔹 If the output is a string, apply .split() as shown in Fix 1.
+
+✅ Final Steps: Tokenize Train & Validation Data
+python
+Copy
+Edit
+# Tokenize datasets
+train_encodings = tokenize_and_align_labels(train_sentences, train_labels)
+val_encodings = tokenize_and_align_labels(val_sentences, val_labels)
+✅ Now train_encodings and val_encodings are correctly formatted
+
+🚀 Summary
+✅ Ensures sentences are tokenized into word lists before passing to tokenizer()
+✅ Fixes pre-tokenized encode input must be a union of pretokenized sequences error
+✅ Prevents issues with incorrect is_split_into_words=True usage
+
+Try these fixes and let me know if it works! 🚀🔥
+
+
+
+
+
+
+
+
+
+##############
  Issue: "Pre-tokenized encode input must be a union of pre-tokenized input sequences"
 This error happens when the tokenizer expects pre-tokenized input but receives an incorrectly formatted string or list.
 
