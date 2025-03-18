@@ -1,4 +1,86 @@
-Here’s the Python code for visualizing Banking data only, focusing on Net Loss Amount and Number of Events over time (monthly, quarterly, yearly).
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pptx import Presentation
+from pptx.util import Inches
+from io import BytesIO
+
+# Load your P&C data (Replace with actual CSV or DataFrame)
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=48, freq="M"),
+    "Net_Loss": [abs(x) for x in (300000 * pd.np.random.randn(48)).tolist()],  # Smaller Losses
+    "Num_Events": [abs(int(x)) for x in (10 + 5 * pd.np.random.randn(48)).tolist()],  # Lower Frequency
+}
+
+df = pd.DataFrame(data)
+df["Date"] = pd.to_datetime(df["Date"])
+df["Quarter"] = df["Date"].dt.to_period("Q")  # Convert to Quarterly Data
+
+# Group Data for Quarterly Analysis
+df_quarterly = df.groupby("Quarter")[["Net_Loss", "Num_Events"]].sum().reset_index()
+
+# PowerPoint File
+prs = Presentation()
+
+def save_plot_to_ppt(title, fig, ppt):
+    """ Saves a matplotlib figure to a PowerPoint slide. """
+    slide = ppt.slides.add_slide(ppt.slide_layouts[5])  # Blank slide
+    title_box = slide.shapes.title
+    title_box.text = title
+
+    # Convert Matplotlib figure to PNG
+    img_stream = BytesIO()
+    fig.savefig(img_stream, format="png", bbox_inches="tight")
+    img_stream.seek(0)
+
+    # Insert image into slide
+    slide.shapes.add_picture(img_stream, Inches(1), Inches(1), width=Inches(8))
+
+    plt.close(fig)  # Close figure to free memory
+
+# 📊 **1. Line Chart - Net Loss Over Time**
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(df["Date"], df["Net_Loss"], marker='o', linestyle='-', color="g", label="P&C - Net Loss")
+ax.set_xlabel("Date")
+ax.set_ylabel("Net Loss Amount ($)")
+ax.set_title("Net Loss Trend Over Time - P&C")
+ax.legend()
+ax.grid()
+save_plot_to_ppt("Net Loss Trend Over Time - P&C", fig, prs)
+
+# 📊 **2. Box Plot - Distribution of Net Loss**
+fig, ax = plt.subplots(figsize=(8, 5))
+sns.boxplot(y=df["Net_Loss"], ax=ax, color="green")
+ax.set_title("Distribution of Net Loss Amounts - P&C")
+ax.set_ylabel("Net Loss Amount ($)")
+ax.grid()
+save_plot_to_ppt("Distribution of Net Loss - P&C", fig, prs)
+
+# 📊 **3. Quarterly Bar Chart - Net Loss Comparison**
+fig, ax = plt.subplots(figsize=(12, 6))
+df_quarterly.plot(kind="bar", x="Quarter", y="Net_Loss", legend=False, ax=ax, color="green")
+ax.set_xlabel("Quarter (2021–2024)")
+ax.set_ylabel("Total Net Loss ($)")
+ax.set_title("Quarterly Net Loss - P&C")
+plt.xticks(rotation=45)
+save_plot_to_ppt("Quarterly Net Loss - P&C", fig, prs)
+
+# 📊 **4. Line Chart - Number of Events Over Time**
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(df["Date"], df["Num_Events"], marker='o', linestyle='-', color="orange", label="P&C - Num of Events")
+ax.set_xlabel("Date")
+ax.set_ylabel("Number of Events")
+ax.set_title("Event Count Trends Over Time - P&C")
+ax.legend()
+ax.grid()
+save_plot_to_ppt("Event Count Trends Over Time - P&C", fig, prs)
+
+# Save PowerPoint File
+prs.save("PC_Loss_Analysis.pptx")
+print("PowerPoint file saved as PC_Loss_Analysis.pptx")
+
+$$$$$$$$Here’s the Python code for visualizing Banking data only, focusing on Net Loss Amount and Number of Events over time (monthly, quarterly, yearly).
 
 📌 What This Code Does:
 Filters data for Banking only.
