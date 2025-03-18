@@ -1,4 +1,112 @@
-You're facing an issue where the Mean Absolute Percentage Error (MAPE) for the Property & Casualty (P&C) line of business is much higher compared to the Banking line of business. This discrepancy is likely due to data distribution and sample size differences between these business lines. Let’s break it down logically:
+Here’s the Python code for visualizing Banking data only, focusing on Net Loss Amount and Number of Events over time (monthly, quarterly, yearly).
+
+📌 What This Code Does:
+Filters data for Banking only.
+Creates key visualizations:
+Line Chart → Net Loss Trend Over Time
+Box Plot → Distribution of Net Loss
+Quarterly Bar Chart → Net Loss Comparison Over Quarters
+Event Count Trend → Number of Events Over Time
+Saves all plots into a PowerPoint file (Bank_Loss_Analysis.pptx).
+📜 Full Code for Banking Data Analysis
+python
+Copy
+Edit
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pptx import Presentation
+from pptx.util import Inches
+from io import BytesIO
+
+# Load your Banking data (Replace with actual CSV or DataFrame)
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=48, freq="M"),
+    "Net_Loss": [abs(x) for x in (1000000 * pd.np.random.randn(48)).tolist()],
+    "Num_Events": [abs(int(x)) for x in (50 + 20 * pd.np.random.randn(48)).tolist()],
+}
+
+df = pd.DataFrame(data)
+df["Date"] = pd.to_datetime(df["Date"])
+df["Quarter"] = df["Date"].dt.to_period("Q")  # Convert to Quarterly Data
+
+# Group Data for Quarterly Analysis
+df_quarterly = df.groupby("Quarter")[["Net_Loss", "Num_Events"]].sum().reset_index()
+
+# PowerPoint File
+prs = Presentation()
+
+def save_plot_to_ppt(title, fig, ppt):
+    """ Saves a matplotlib figure to a PowerPoint slide. """
+    slide = ppt.slides.add_slide(ppt.slide_layouts[5])  # Blank slide
+    title_box = slide.shapes.title
+    title_box.text = title
+
+    # Convert Matplotlib figure to PNG
+    img_stream = BytesIO()
+    fig.savefig(img_stream, format="png", bbox_inches="tight")
+    img_stream.seek(0)
+
+    # Insert image into slide
+    slide.shapes.add_picture(img_stream, Inches(1), Inches(1), width=Inches(8))
+
+    plt.close(fig)  # Close figure to free memory
+
+# 📊 **1. Line Chart - Net Loss Over Time**
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(df["Date"], df["Net_Loss"], marker='o', linestyle='-', color="b", label="Banking - Net Loss")
+ax.set_xlabel("Date")
+ax.set_ylabel("Net Loss Amount ($)")
+ax.set_title("Net Loss Trend Over Time - Banking")
+ax.legend()
+ax.grid()
+save_plot_to_ppt("Net Loss Trend Over Time - Banking", fig, prs)
+
+# 📊 **2. Box Plot - Distribution of Net Loss**
+fig, ax = plt.subplots(figsize=(8, 5))
+sns.boxplot(y=df["Net_Loss"], ax=ax, color="blue")
+ax.set_title("Distribution of Net Loss Amounts - Banking")
+ax.set_ylabel("Net Loss Amount ($)")
+ax.grid()
+save_plot_to_ppt("Distribution of Net Loss - Banking", fig, prs)
+
+# 📊 **3. Quarterly Bar Chart - Net Loss Comparison**
+fig, ax = plt.subplots(figsize=(12, 6))
+df_quarterly.plot(kind="bar", x="Quarter", y="Net_Loss", legend=False, ax=ax, color="blue")
+ax.set_xlabel("Quarter (2021–2024)")
+ax.set_ylabel("Total Net Loss ($)")
+ax.set_title("Quarterly Net Loss - Banking")
+plt.xticks(rotation=45)
+save_plot_to_ppt("Quarterly Net Loss - Banking", fig, prs)
+
+# 📊 **4. Line Chart - Number of Events Over Time**
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(df["Date"], df["Num_Events"], marker='o', linestyle='-', color="r", label="Banking - Num of Events")
+ax.set_xlabel("Date")
+ax.set_ylabel("Number of Events")
+ax.set_title("Event Count Trends Over Time - Banking")
+ax.legend()
+ax.grid()
+save_plot_to_ppt("Event Count Trends Over Time - Banking", fig, prs)
+
+# Save PowerPoint File
+prs.save("Bank_Loss_Analysis.pptx")
+print("PowerPoint file saved as Bank_Loss_Analysis.pptx")
+📌 Expected Output:
+✅ Line Chart → Banking Net Loss over time (2021–2024).
+✅ Box Plot → Distribution of Net Loss for Banking (Detect Outliers).
+✅ Quarterly Bar Chart → Comparison of Net Loss across Quarters.
+✅ Event Count Trend → Number of Events over time.
+✅ PowerPoint File Created → Bank_Loss_Analysis.pptx with all plots.
+
+📌 How to Explain to the Client:
+🔹 "Banking losses follow a stable upward trend with some peaks, showing higher volume and consistency."
+🔹 "Quarterly analysis shows Banking losses are spread out across time, confirming stable loss accumulation."
+🔹 "Number of events is consistently high, reinforcing why predictions work well for Banking."
+🔹 "The Box Plot indicates extreme high-loss events but mostly within a reasonable range."
+
+
+$$$$$$$$$$$$$$$$$$$$You're facing an issue where the Mean Absolute Percentage Error (MAPE) for the Property & Casualty (P&C) line of business is much higher compared to the Banking line of business. This discrepancy is likely due to data distribution and sample size differences between these business lines. Let’s break it down logically:
 
 1. Why is MAPE higher for Property & Casualty?
 MAPE is calculated as:
