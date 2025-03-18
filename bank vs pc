@@ -1,4 +1,10 @@
 
+Monte Carlo simulations require a substantial amount of historical data to produce reliable predictions. With fewer loss events in P&C, the model may face challenges in accurately estimating loss distributions, resulting in greater variability in predictions.
+"P&C losses are significantly lower than Banking, as evident from the trend analysis."
+🔹 "The distribution shows that while P&C has some high-loss events, they are less frequent."
+🔹 "Quarterly analysis confirms that P&C losses occur sporadically, making prediction harder."
+🔹 "The lower number of events leads to higher MAPE, as small errors in prediction have a bigger
+####
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
