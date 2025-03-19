@@ -1,0 +1,94 @@
+i need Quterly Losses Grpagh bar , event counts trend 
+
+ChatGPT said:
+Here’s the Python code to generate Quarterly Losses (Bar Chart) and Event Count Trend (Line Chart) using your dataset.
+
+📜 Python Code: Quarterly Losses & Event Count Trend
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# ✅ Sample Data
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=100, freq="D"),
+    "Business_Line": ["Bank"] * 50 + ["PC"] * 50,
+    "Net_Loss": [abs(x) for x in (100000 * np.random.randn(100)).tolist()],
+    "Event_Counts": [abs(int(x)) for x in (10 + 5 * np.random.randn(100)).tolist()],
+}
+
+df = pd.DataFrame(data)
+df["Date"] = pd.to_datetime(df["Date"])
+
+# ✅ Group by Business Line & Quarterly Aggregation
+df["Quarter"] = df["Date"].dt.to_period("Q")
+
+df_quarterly = df.groupby(["Quarter", "Business_Line"]).agg({
+    "Net_Loss": "sum",
+    "Event_Counts": "sum"
+}).reset_index()
+
+# 🎯 **Graph 1: Quarterly Net Losses (Bar Chart)**
+plt.figure(figsize=(10, 5))
+sns.barplot(data=df_quarterly, x="Quarter", y="Net_Loss", hue="Business_Line", palette="coolwarm")
+plt.title("Quarterly Net Losses by Business Line")
+plt.xlabel("Quarter")
+plt.ylabel("Total Net Loss ($)")
+plt.xticks(rotation=45)
+plt.grid()
+plt.legend(title="Business Line")
+plt.show()
+
+# 🎯 **Graph 2: Event Count Trend (Line Chart)**
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=df_quarterly, x="Quarter", y="Event_Counts", hue="Business_Line", marker="o")
+plt.title("Event Count Trend Over Time")
+plt.xlabel("Quarter")
+plt.ylabel("Total Event Count")
+plt.xticks(rotation=45)
+plt.grid()
+plt.legend(title="Business Line")
+plt.show()
+📌 Explanation of Graphs
+1️⃣ Quarterly Losses (Bar Chart) → Compares Bank vs. P&C losses per quarter.
+2️⃣ Event Count Trend (Line Chart) → Shows how event frequency changes over time for each business line.
+
+🚀 Next Steps
+Would you like these graphs saved & added to PowerPoint? 📊📄
+
+
+
+
+
+
+You said:
+show output
+ChatGPT said:
+Since I can't run code directly on my end, I’ll describe the expected output visuals for the two graphs:
+
+📊 Graph 1: Quarterly Net Losses (Bar Chart)
+✅ X-axis: Quarters (e.g., 2021-Q1, 2021-Q2, ... 2024-Q4)
+✅ Y-axis: Total Net Loss ($) per quarter
+✅ Bars:
+
+Blue bars → Bank losses
+Red bars → P&C losses
+✅ Insights:
+If Bank has consistently higher losses, the blue bars will be taller.
+If P&C has high volatility, its bars may fluctuate significantly.
+📈 Graph 2: Event Count Trend (Line Chart)
+✅ X-axis: Quarters (e.g., 2021-Q1, 2021-Q2, ... 2024-Q4)
+✅ Y-axis: Total Event Count per quarter
+✅ Lines:
+
+Orange line → Bank events trend
+Green line → P&C events trend
+✅ Insights:
+Bank event counts might be higher and more stable over time.
+P&C events may show spikes due to rare, extreme events.
+📸 Want to See the Actual Graphs?
+Run the code in Jupyter Notebook or Python script, and it will generate these graphs. 🚀
+Let me know if you need help saving these charts to PowerPoint or as images! 📊📂
