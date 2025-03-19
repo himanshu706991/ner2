@@ -1,3 +1,60 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ✅ Sample Data
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=100, freq="D"),
+    "Business_Line": ["Bank"] * 50 + ["PC"] * 50,
+    "Net_Loss": [abs(x) for x in (100000 * np.random.randn(100)).tolist()],
+    "Event_Counts": [abs(int(x)) for x in (10 + 5 * np.random.randn(100)).tolist()],
+}
+
+df = pd.DataFrame(data)
+df["Date"] = pd.to_datetime(df["Date"])
+
+# ✅ Group by Business Line & Quarterly Aggregation
+df["Quarter"] = df["Date"].dt.to_period("Q")
+df_quarterly = df.groupby(["Quarter", "Business_Line"]).agg({
+    "Net_Loss": "sum",
+    "Event_Counts": "sum"
+}).reset_index()
+
+# 🎯 **Graph 1: Quarterly Net Loss (Simple Bar Chart)**
+plt.figure(figsize=(10, 5))
+bars = plt.bar(df_quarterly["Quarter"].astype(str), df_quarterly["Net_Loss"], color="skyblue")
+plt.title("Quarterly Net Loss")
+plt.xlabel("Quarter")
+plt.ylabel("Total Net Loss ($)")
+plt.xticks(rotation=45)
+plt.ylim(0, df_quarterly["Net_Loss"].max() * 1.2)
+
+# ✅ Add Labels on Bars
+for bar in bars:
+    plt.text(bar.get_x() + bar.get_width()/2 - 0.1, bar.get_height() + 50000, 
+             f"{int(bar.get_height()):,}", ha='center', fontsize=10, fontweight='bold')
+
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+plt.show()
+
+# 🎯 **Graph 2: Quarterly Event Counts (Simple Bar Chart)**
+plt.figure(figsize=(10, 5))
+bars = plt.bar(df_quarterly["Quarter"].astype(str), df_quarterly["Event_Counts"], color="lightcoral")
+plt.title("Quarterly Event Counts")
+plt.xlabel("Quarter")
+plt.ylabel("Total Event Count")
+plt.xticks(rotation=45)
+plt.ylim(0, df_quarterly["Event_Counts"].max() * 1.2)
+
+# ✅ Add Labels on Bars
+for bar in bars:
+    plt.text(bar.get_x() + bar.get_width()/2 - 0.1, bar.get_height() + 1, 
+             f"{int(bar.get_height()):,}", ha='center', fontsize=10, fontweight='bold')
+
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+plt.show()
+
+$$$$$$
 i need Quterly Losses Grpagh bar , event counts trend 
 plt.ylim(0, df_quarterly["Net_Loss"].max() * 1.2)
 ChatGPT said:
