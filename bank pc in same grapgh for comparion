@@ -1,3 +1,129 @@
+# ✅ Group by Business Line & Monthly Aggregation
+df_grouped = df.groupby([pd.Grouper(key="Date", freq="M"), "Business_Line"]).agg({
+    "Net_Loss": "sum",  # Sum of Net Loss per month per Business Line
+    "Event_Counts": "sum",  # Sum of Event Counts per month per Business Line
+}).reset_index()
+
+
+
+$$$
+import pandas as pd
+import numpy as np
+import scipy.stats as stats
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample Data
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=100, freq="D"),
+    "Business_Line": ["Bank"] * 50 + ["PC"] * 50,
+    "Net_Loss": [abs(x) for x in (100000 * np.random.randn(100)).tolist()],
+    "Event_Counts": [abs(int(x)) for x in (10 + 5 * np.random.randn(100)).tolist()],
+}
+
+df = pd.DataFrame(data)
+df["Date"] = pd.to_datetime(df["Date"])
+
+# ✅ Group by Business Line & Monthly Aggregation
+df_grouped = df.groupby([pd.Grouper(key="Date", freq="M"), "Business_Line"]).agg({
+    "Net_Loss": "sum",
+    "Event_Counts": "sum"
+}).reset_index()
+
+# ✅ Add Quarterly Aggregation
+df_grouped["Quarter"] = df_grouped["Date"].dt.to_period("Q")
+
+# 🎯 **Graph 1: Net Loss Distribution (Histogram)**
+plt.figure(figsize=(10, 5))
+sns.histplot(df["Net_Loss"], bins=30, kde=True, color="blue")
+plt.title("Net Loss Distribution")
+plt.xlabel("Net Loss Amount ($)")
+plt.ylabel("Frequency")
+plt.grid()
+plt.show()
+
+# 🎯 **Graph 2: Q-Q Plot (Checking Normality)**
+plt.figure(figsize=(6, 6))
+stats.probplot(df["Net_Loss"], dist="norm", plot=plt)
+plt.title("Q-Q Plot for Net Loss")
+plt.grid()
+plt.show()
+
+# 🎯 **Graph 3: Event Count Trend Over Time**
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=df_grouped, x="Date", y="Event_Counts", hue="Business_Line", marker="o")
+plt.title("Event Count Trend Over Time")
+plt.xlabel("Date")
+plt.ylabel("Number of Events")
+plt.xticks(rotation=45)
+plt.grid()
+plt.legend(title="Business Line")
+plt.show()
+
+# 🎯 **Graph 4: Quarterly Losses**
+df_quarterly = df_grouped.groupby(["Quarter", "Business_Line"])["Net_Loss"].sum().unstack()
+df_quarterly.plot(kind="bar", figsize=(10, 5), stacked=True, colormap="coolwarm")
+plt.title("Quarterly Net Losses by Business Line")
+plt.xlabel("Quarter")
+plt.ylabel("Total Net Loss ($)")
+plt.xticks(rotation=45)
+plt.grid()
+plt.legend(title="Business Line")
+plt.show()
+1️⃣ Net Loss Distribution (Histogram) → Shows how losses are spread and whether they are skewed.
+2️⃣ Q-Q Plot → Checks if Net Loss follows a normal distribution (Monte Carlo assumes normality).
+3️⃣ Event Count Trend → Helps visualize how frequently loss events occur over time.
+4️⃣ Quarterly Losses → Compares P&C vs. Bank losses per quarter for deeper insights.
+$$$$
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample Data
+np.random.seed(42)  # For reproducibility
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=100, freq="D"),
+    "Business_Line": ["Bank"] * 50 + ["PC"] * 50,
+    "Net_Loss": [abs(x) for x in (100000 * np.random.randn(100)).tolist()],
+    "Event_Counts": [abs(int(x)) for x in (10 + 5 * np.random.randn(100)).tolist()],
+}
+
+df = pd.DataFrame(data)
+
+# Convert 'Date' to datetime
+df["Date"] = pd.to_datetime(df["Date"])
+
+# ✅ Group by Business Line & Monthly Aggregation
+df_grouped = df.groupby([pd.Grouper(key="Date", freq="M"), "Business_Line"]).agg({
+    "Net_Loss": "sum",
+    "Event_Counts": "sum",
+}).reset_index()
+
+# ✅ Create Line Plot: Net Loss Over Time
+plt.figure(figsize=(12, 6))
+sns.lineplot(data=df_grouped, x="Date", y="Net_Loss", hue="Business_Line", marker="o")
+plt.title("Monthly Net Loss Trend by Business Line")
+plt.xlabel("Date")
+plt.ylabel("Net Loss ($)")
+plt.xticks(rotation=45)
+plt.grid()
+plt.legend(title="Business Line")
+plt.show()
+
+# ✅ Create Bar Plot: Event Counts Over Time
+plt.figure(figsize=(12, 6))
+sns.barplot(data=df_grouped, x="Date", y="Event_Counts", hue="Business_Line")
+plt.title("Monthly Event Count by Business Line")
+plt.xlabel("Date")
+plt.ylabel("Total Events")
+plt.xticks(rotation=45)
+plt.grid()
+plt.legend(title="Business Line")
+plt.show()
+
+
+#####################
 but that cinet is not understanding he is saying it means montecarlo is not stable method for bank it is doing good but for pc becaus of less frequenct interm of loss and event its not perform ing well, client is saying in pc thoe are outlier  that is why montecarlo not handling
 ChatGPT said:
 Your client is correct in stating that Monte Carlo is struggling for P&C due to outliers and low event frequency. This means Monte Carlo is not stable for P&C, as it assumes a well-behaved distribution, which is not the case here.
