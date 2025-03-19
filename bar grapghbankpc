@@ -1,5 +1,5 @@
 i need Quterly Losses Grpagh bar , event counts trend 
-
+plt.ylim(0, df_quarterly["Net_Loss"].max() * 1.2)
 ChatGPT said:
 Here’s the Python code to generate Quarterly Losses (Bar Chart) and Event Count Trend (Line Chart) using your dataset.
 
