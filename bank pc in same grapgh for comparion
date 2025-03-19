@@ -1,3 +1,325 @@
+
+
+see i have date,quarter,busineslinee,netloss,event count in asingle grapgh i need bar grapgh bank and pc business line quaretely bargrapgh
+
+ChatGPT said:
+You want a quarterly bar chart where Bank & P&C losses (or event counts) are grouped together per quarter. Here's how you can achieve this:
+
+📜 Python Code: Quarterly Bar Graph for Bank & P&C
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ✅ Sample Data
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=100, freq="D"),
+    "Business_Line": ["Bank"] * 50 + ["PC"] * 50,
+    "Net_Loss": [abs(x) for x in (100000 * np.random.randn(100)).tolist()],
+    "Event_Counts": [abs(int(x)) for x in (10 + 5 * np.random.randn(100)).tolist()],
+}
+
+df = pd.DataFrame(data)
+df["Date"] = pd.to_datetime(df["Date"])
+
+# ✅ Convert Date to Quarterly
+df["Quarter"] = df["Date"].dt.to_period("Q")
+
+# ✅ Group by Quarter & Business Line
+df_quarterly = df.groupby(["Quarter", "Business_Line"]).agg({
+    "Net_Loss": "sum",
+    "Event_Counts": "sum"
+}).reset_index()
+
+# ✅ Pivot Data for Stacked Bar Graph
+df_pivot = df_quarterly.pivot(index="Quarter", columns="Business_Line", values="Net_Loss")
+
+# 🎯 **Graph: Quarterly Net Loss for Bank & P&C**
+plt.figure(figsize=(10, 6))
+df_pivot.plot(kind="bar", stacked=False, colormap="coolwarm", width=0.7)
+
+plt.title("Quarterly Net Loss by Business Line")
+plt.xlabel("Quarter")
+plt.ylabel("Total Net Loss ($)")
+plt.xticks(rotation=45)
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+plt.legend(title="Business Line")
+
+plt.show()
+📌 What’s Included?
+✅ Grouped Bar Chart (Side-by-Side Bars) for Bank & P&C per quarter.
+✅ X-axis: Quarters (2021-Q1, 2021-Q2, ..., 2024-Q4).
+✅ Y-axis: Total Net Loss ($).
+✅ Color-coded bars: Bank & P&C are visually distinct.
+✅ Grid lines for better readability.
+
+📊 Expected Output
+A bar graph where each quarter has 2 bars:
+One for Bank
+One for P&C
+Easier comparison between Bank & P&C losses per quarter.
+Would you like to do the same for Event Counts? 📊📈
+
+
+
+
+
+
+You said:
+yes
+ChatGPT said:
+Here’s the Python code for a quarterly bar chart comparing Event Counts for Bank & P&C (similar to Net Loss).
+
+📜 Python Code: Quarterly Event Count (Bank & P&C)
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ✅ Sample Data
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=100, freq="D"),
+    "Business_Line": ["Bank"] * 50 + ["PC"] * 50,
+    "Net_Loss": [abs(x) for x in (100000 * np.random.randn(100)).tolist()],
+    "Event_Counts": [abs(int(x)) for x in (10 + 5 * np.random.randn(100)).tolist()],
+}
+
+df = pd.DataFrame(data)
+df["Date"] = pd.to_datetime(df["Date"])
+
+# ✅ Convert Date to Quarterly
+df["Quarter"] = df["Date"].dt.to_period("Q")
+
+# ✅ Group by Quarter & Business Line for Event Counts
+df_quarterly = df.groupby(["Quarter", "Business_Line"]).agg({
+    "Net_Loss": "sum",
+    "Event_Counts": "sum"
+}).reset_index()
+
+# ✅ Pivot Data for Stacked Bar Graph (Event Counts)
+df_pivot_events = df_quarterly.pivot(index="Quarter", columns="Business_Line", values="Event_Counts")
+
+# 🎯 **Graph: Quarterly Event Counts for Bank & P&C**
+plt.figure(figsize=(10, 6))
+df_pivot_events.plot(kind="bar", stacked=False, colormap="coolwarm", width=0.7)
+
+plt.title("Quarterly Event Counts by Business Line")
+plt.xlabel("Quarter")
+plt.ylabel("Total Event Counts")
+plt.xticks(rotation=45)
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+plt.legend(title="Business Line")
+
+plt.show()
+📌 What’s Included?
+✅ Grouped Bar Chart for Event Counts (Bank & P&C per quarter).
+✅ X-axis: Quarters (2021-Q1, 2021-Q2, ..., 2024-Q4).
+✅ Y-axis: Total Event Counts.
+✅ Color-coded bars for Bank & P&C.
+✅ Grid lines for better readability.
+
+📊 Expected Output
+A bar graph where each quarter has 2 bars:
+One for Bank
+One for P&C
+Easier comparison of how event counts vary over time.
+🚀 Next Steps
+Would you like to save these charts to PowerPoint? 📊📂
+Do you need MAPE calculations for event counts as well?
+
+
+
+
+
+You said:
+add label value on bar
+ChatGPT said:
+Here’s the updated code with labels on top of each bar for Quarterly Event Counts and Quarterly Net Loss.
+
+📜 Python Code: Quarterly Bar Graphs with Labels
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ✅ Sample Data
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=100, freq="D"),
+    "Business_Line": ["Bank"] * 50 + ["PC"] * 50,
+    "Net_Loss": [abs(x) for x in (100000 * np.random.randn(100)).tolist()],
+    "Event_Counts": [abs(int(x)) for x in (10 + 5 * np.random.randn(100)).tolist()],
+}
+
+df = pd.DataFrame(data)
+df["Date"] = pd.to_datetime(df["Date"])
+
+# ✅ Convert Date to Quarterly
+df["Quarter"] = df["Date"].dt.to_period("Q")
+
+# ✅ Group by Quarter & Business Line
+df_quarterly = df.groupby(["Quarter", "Business_Line"]).agg({
+    "Net_Loss": "sum",
+    "Event_Counts": "sum"
+}).reset_index()
+
+# ✅ Pivot Data for Bar Graph
+df_pivot_loss = df_quarterly.pivot(index="Quarter", columns="Business_Line", values="Net_Loss")
+df_pivot_events = df_quarterly.pivot(index="Quarter", columns="Business_Line", values="Event_Counts")
+
+# 🎯 **Function to Add Labels on Bars**
+def add_labels(bars):
+    for bar in bars:
+        height = bar.get_height()
+        if height > 0:  # Only label bars with a height
+            plt.text(bar.get_x() + bar.get_width() / 2, height + 50000, f"{int(height):,}", 
+                     ha='center', fontsize=10, fontweight='bold')
+
+# 🎯 **Graph 1: Quarterly Net Loss (Bar Chart)**
+plt.figure(figsize=(10, 6))
+bars = df_pivot_loss.plot(kind="bar", stacked=False, colormap="coolwarm", width=0.7)
+plt.title("Quarterly Net Loss by Business Line")
+plt.xlabel("Quarter")
+plt.ylabel("Total Net Loss ($)")
+plt.xticks(rotation=45)
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+plt.legend(title="Business Line")
+
+# ✅ Add Labels on Bars
+for container in bars.containers:
+    add_labels(container)
+
+plt.show()
+
+# 🎯 **Graph 2: Quarterly Event Counts (Bar Chart)**
+plt.figure(figsize=(10, 6))
+bars = df_pivot_events.plot(kind="bar", stacked=False, colormap="coolwarm", width=0.7)
+plt.title("Quarterly Event Counts by Business Line")
+plt.xlabel("Quarter")
+plt.ylabel("Total Event Counts")
+plt.xticks(rotation=45)
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+plt.legend(title="Business Line")
+
+# ✅ Add Labels on Bars
+for container in bars.containers:
+    add_labels(container)
+
+plt.show()
+📌 What’s New?
+✅ Labels added on top of each bar for both Net Loss & Event Counts.
+✅ Automatically formats numbers with commas (e.g., 100,000).
+✅ Ensures labels are only added for bars with values > 0.
+✅ Better readability with gridlines & color-coded bars.
+
+📊 Expected Output
+1️⃣ Quarterly Net Loss Bar Chart → Clearly labeled losses for Bank & P&C per quarter.
+2️⃣ Quarterly Event Counts Bar Chart → Labeled event frequencies per quarter.
+
+Would you like to export these graphs to PowerPoint? 🚀📊
+
+
+
+
+
+
+You said:
+can u show output
+ChatGPT said:
+I can't directly display the output here, but you can run the provided Python code in Jupyter Notebook or any Python environment, and you will get the following expected outputs:
+
+📊 Expected Graphs
+1️⃣ Quarterly Net Loss Bar Chart
+
+X-axis: Quarters (e.g., 2021-Q1, 2021-Q2, ..., 2024-Q4).
+Y-axis: Total Net Loss ($).
+Bars: One for Bank, one for P&C per quarter.
+Labels: Numeric values on top of each bar (formatted with commas).
+Color-coded bars for Bank & P&C.
+Gridlines for better readability.
+2️⃣ Quarterly Event Counts Bar Chart
+
+Same layout as the Net Loss Chart but for event counts instead of losses.
+📌 Next Steps
+If you need the graphs saved as PNG/PPT, let me know! 📊📂
+If you face any errors, share the traceback, and I'll fix them. 🚀
+
+
+
+
+
+You said:
+for event clount can u show trend chart
+ChatGPT said:
+Yes! Below is the trend chart (line chart) for Event Counts over time, showing the trend for Bank & P&C quarterly.
+
+📜 Python Code: Event Count Trend Chart
+python
+Copy
+Edit
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ✅ Sample Data
+data = {
+    "Date": pd.date_range(start="2021-01-01", periods=100, freq="D"),
+    "Business_Line": ["Bank"] * 50 + ["PC"] * 50,
+    "Net_Loss": [abs(x) for x in (100000 * np.random.randn(100)).tolist()],
+    "Event_Counts": [abs(int(x)) for x in (10 + 5 * np.random.randn(100)).tolist()],
+}
+
+df = pd.DataFrame(data)
+df["Date"] = pd.to_datetime(df["Date"])
+
+# ✅ Convert Date to Quarterly
+df["Quarter"] = df["Date"].dt.to_period("Q")
+
+# ✅ Group by Quarter & Business Line for Event Counts
+df_quarterly = df.groupby(["Quarter", "Business_Line"]).agg({
+    "Event_Counts": "sum"
+}).reset_index()
+
+# ✅ Pivot Data for Line Chart
+df_pivot_events = df_quarterly.pivot(index="Quarter", columns="Business_Line", values="Event_Counts")
+
+# 🎯 **Graph: Event Count Trend Over Time**
+plt.figure(figsize=(10, 6))
+plt.plot(df_pivot_events.index.astype(str), df_pivot_events["Bank"], marker="o", linestyle="-", color="blue", label="Bank")
+plt.plot(df_pivot_events.index.astype(str), df_pivot_events["PC"], marker="s", linestyle="--", color="red", label="P&C")
+
+plt.title("Event Count Trend Over Time (Quarterly)")
+plt.xlabel("Quarter")
+plt.ylabel("Total Event Counts")
+plt.xticks(rotation=45)
+plt.legend(title="Business Line")
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+
+# ✅ Add Data Labels on Points
+for i, txt in enumerate(df_pivot_events["Bank"]):
+    plt.text(i, txt, f"{txt:,}", ha="right", fontsize=10, fontweight="bold", color="blue")
+
+for i, txt in enumerate(df_pivot_events["PC"]):
+    plt.text(i, txt, f"{txt:,}", ha="right", fontsize=10, fontweight="bold", color="red")
+
+plt.show()
+📌 What’s Included?
+✅ Line Chart to Show Event Count Trends for Bank & P&C.
+✅ X-axis: Quarters (e.g., 2021-Q1, 2021-Q2, ..., 2024-Q4).
+✅ Y-axis: Total Event Counts.
+✅ Color-coded lines:
+
+🔵 Blue (Bank) → Solid line with circles.
+🔴 Red (P&C) → Dashed line with squares.
+✅ Data Labels on Points → Numeric values on each data point.
+✅ Grid lines for better readability.
+
+%%%
 # ✅ Group by Business Line & Monthly Aggregation
 df_grouped = df.groupby([pd.Grouper(key="Date", freq="M"), "Business_Line"]).agg({
     "Net_Loss": "sum",  # Sum of Net Loss per month per Business Line
